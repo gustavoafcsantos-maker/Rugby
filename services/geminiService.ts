@@ -3,14 +3,24 @@ import { Player, Position, Match, TrainingSession } from '../types';
 
 const MODEL_NAME = 'gemini-3-flash-preview';
 
+// Função segura para obter a API Key sem causar erro se 'process' não existir
+const getApiKey = (): string => {
+  if (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
+    return (window as any).process.env.API_KEY;
+  }
+  return "";
+};
+
 export const generateTrainingPlan = async (
   playerCount: number,
   recentFocus: string,
   positions: string[]
 ): Promise<string> => {
   try {
-    // Inicialização movida para dentro da função para evitar crashes no load se a key não existir
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getApiKey();
+    if (!apiKey) return "API Key em falta. Configure no index.html.";
+
+    const ai = new GoogleGenAI({ apiKey });
     
     const prompt = `
       Atuo como treinador de rugby.
@@ -35,7 +45,7 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico. Verifique se configurou a API Key no index.html ou nas variáveis de ambiente.";
+    return "Erro ao contactar o assistente técnico. Verifique a consola para mais detalhes.";
   }
 };
 
@@ -45,8 +55,10 @@ export const generateMatchStrategy = async (
   location: string
 ): Promise<string> => {
   try {
-    // Inicialização movida para dentro da função
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getApiKey();
+    if (!apiKey) return "API Key em falta. Configure no index.html.";
+
+    const ai = new GoogleGenAI({ apiKey });
 
     const forwards = squad.filter(p => [Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));
     const backs = squad.filter(p => ![Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));
@@ -77,6 +89,6 @@ export const generateMatchStrategy = async (
     return response.text || "Não foi possível gerar a estratégia.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico. Verifique a chave da API.";
+    return "Erro ao contactar o assistente técnico.";
   }
 };

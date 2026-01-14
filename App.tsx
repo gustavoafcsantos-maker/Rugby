@@ -1350,11 +1350,15 @@ const AICoachView = () => {
     const chatRef = useRef<any>(null);
 
     useEffect(() => {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        chatRef.current = ai.chats.create({ 
-            model: 'gemini-3-flash-preview', 
-            config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
-        });
+        // Safe API Key access
+        const apiKey = (window as any).process?.env?.API_KEY;
+        if (apiKey) {
+            const ai = new GoogleGenAI({ apiKey });
+            chatRef.current = ai.chats.create({ 
+                model: 'gemini-3-flash-preview', 
+                config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
+            });
+        }
     }, []);
 
     const send = async () => {
@@ -1364,10 +1368,14 @@ const AICoachView = () => {
         setMessages(p => [...p, { role: 'user', text: msg }]);
         setLoading(true);
         try {
-            const res = await chatRef.current.sendMessage({ message: msg });
-            setMessages(p => [...p, { role: 'model', text: res.text }]);
+            if (!chatRef.current) {
+                setMessages(p => [...p, { role: 'model', text: 'Erro: API Key não encontrada. Configure no index.html.' }]);
+            } else {
+                const res = await chatRef.current.sendMessage({ message: msg });
+                setMessages(p => [...p, { role: 'model', text: res.text }]);
+            }
         } catch(e) {
-            setMessages(p => [...p, { role: 'model', text: 'Desculpe, não consigo responder neste momento.' }]);
+            setMessages(p => [...p, { role: 'model', text: 'Desculpe, ocorreu um erro ao contactar a IA.' }]);
         }
         setLoading(false);
     };

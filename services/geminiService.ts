@@ -3,13 +3,23 @@ import { Player, Position, Match, TrainingSession } from '../types';
 
 const MODEL_NAME = 'gemini-3-flash-preview';
 
+// Helper seguro para obter a instância da IA
+const getAIClient = () => {
+  // Acede via window.process para garantir compatibilidade no browser se o bundler não substituir
+  const apiKey = (window as any).process?.env?.API_KEY || process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API Key não encontrada");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
 export const generateTrainingPlan = async (
   playerCount: number,
   recentFocus: string,
   positions: string[]
 ): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = getAIClient();
     
     const prompt = `
       Atuo como treinador de rugby.
@@ -34,7 +44,7 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico. Verifique a consola para mais detalhes.";
+    return "Erro ao contactar o assistente técnico. Verifique se a API Key está configurada corretamente no index.html.";
   }
 };
 
@@ -44,7 +54,7 @@ export const generateMatchStrategy = async (
   location: string
 ): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = getAIClient();
 
     const forwards = squad.filter(p => [Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));
     const backs = squad.filter(p => ![Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));

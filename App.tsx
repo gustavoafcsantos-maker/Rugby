@@ -54,21 +54,19 @@ const PlayerDetailsModal = ({
 
   // --- Statistics Calculation ---
   
-  // Training Stats
   const playerTrainings = trainings.filter(t => t.attendance[player.id]);
   const totalTrainings = playerTrainings.length;
   const presentCount = playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.PRESENT).length;
   const attendanceRate = totalTrainings > 0 ? Math.round((presentCount / totalTrainings) * 100) : 0;
   
   const trainingDistribution = [
-    { name: 'Presente', value: presentCount, color: '#10b981' }, // Emerald
-    { name: 'Lesionado', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.INJURED).length, color: '#ef4444' }, // Red
-    { name: 'Trabalho/Esc', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.WORK_SCHOOL).length, color: '#3b82f6' }, // Blue
-    { name: 'Indisp.', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.UNAVAILABLE).length, color: '#f59e0b' }, // Amber
-    { name: 'Falta', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.ABSENT).length, color: '#64748b' }, // Slate
+    { name: 'Presente', value: presentCount, color: '#10b981' }, 
+    { name: 'Lesionado', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.INJURED).length, color: '#ef4444' }, 
+    { name: 'Trabalho/Esc', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.WORK_SCHOOL).length, color: '#3b82f6' }, 
+    { name: 'Indisp.', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.UNAVAILABLE).length, color: '#f59e0b' }, 
+    { name: 'Falta', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.ABSENT).length, color: '#64748b' }, 
   ].filter(d => d.value > 0);
 
-  // Match Stats
   const totalMatches = matches.length;
   const selectedMatches = matches.filter(m => m.playerStatus[player.id] === MatchSelectionStatus.SELECTED);
   const starts = matches.filter(m => m.startingXV.includes(player.id)).length;
@@ -113,20 +111,9 @@ const PlayerDetailsModal = ({
           </button>
         </div>
         
-        {/* Tabs */}
         <div className="flex border-b border-slate-200 shrink-0">
-            <button 
-                onClick={() => setActiveTab('details')}
-                className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'details' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                Dados Pessoais
-            </button>
-            <button 
-                onClick={() => setActiveTab('stats')}
-                className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'stats' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                Estatísticas & Performance
-            </button>
+            <button onClick={() => setActiveTab('details')} className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'details' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Dados Pessoais</button>
+            <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'stats' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Estatísticas & Performance</button>
         </div>
         
         <div className="overflow-y-auto p-6">
@@ -135,110 +122,48 @@ const PlayerDetailsModal = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
-                <input 
-                    name="name" 
-                    value={formData.name} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    required
-                />
+                <input name="name" value={formData.name} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" required />
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Posição</label>
-                <select 
-                    name="position" 
-                    value={formData.position} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                >
+                <select name="position" value={formData.position} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                     {(Object.values(Position) as string[]).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                <select 
-                    name="status" 
-                    value={formData.status} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                >
+                <select name="status" value={formData.status} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                     {(Object.values(PlayerStatus) as string[]).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Data de Nascimento</label>
-                <input 
-                    type="date"
-                    name="birthDate" 
-                    value={formData.birthDate || ''} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                />
+                <input type="date" name="birthDate" value={formData.birthDate || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Localidade</label>
-                <input 
-                    type="text"
-                    name="locality" 
-                    value={formData.locality || ''} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    placeholder="Ex: Lisboa"
-                />
+                <input type="text" name="locality" value={formData.locality || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Ex: Lisboa" />
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Altura (cm)</label>
-                <input 
-                    type="number"
-                    name="height" 
-                    value={formData.height || ''} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    placeholder="Ex: 185"
-                />
+                <input type="number" name="height" value={formData.height || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Ex: 185" />
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Peso (kg)</label>
-                <input 
-                    type="number"
-                    name="weight" 
-                    value={formData.weight || ''} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    placeholder="Ex: 95"
-                />
+                <input type="number" name="weight" value={formData.weight || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Ex: 95" />
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Internacionalizações (Caps)</label>
-                <input 
-                    type="number"
-                    name="caps" 
-                    value={formData.caps} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                />
+                <input type="number" name="caps" value={formData.caps} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
                 </div>
             </div>
-            
             <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-                <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">
-                Cancelar
-                </button>
-                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
-                Guardar Alterações
-                </button>
+                <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
+                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">Guardar Alterações</button>
             </div>
             </form>
         ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
-                {/* Highlights */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
                         <p className="text-emerald-800 text-sm font-medium flex items-center gap-2"><IconCheck className="w-4 h-4"/> Assiduidade</p>
@@ -260,27 +185,15 @@ const PlayerDetailsModal = ({
                         <p className="text-lg font-bold text-slate-700 mt-2 truncate">{player.position}</p>
                     </div>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Training Chart */}
                     <div>
                         <h3 className="text-lg font-bold text-slate-800 mb-4">Análise de Treinos</h3>
                          <div className="h-64 border border-slate-100 rounded-xl bg-slate-50/50 p-4">
                             {totalTrainings > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie
-                                        data={trainingDistribution}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={80}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                        >
-                                        {trainingDistribution.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
+                                        <Pie data={trainingDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                        {trainingDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                                         </Pie>
                                         <Tooltip />
                                         <Legend />
@@ -291,8 +204,6 @@ const PlayerDetailsModal = ({
                             )}
                         </div>
                     </div>
-
-                    {/* Selection Breakdown */}
                     <div>
                          <h3 className="text-lg font-bold text-slate-800 mb-4">Análise de Não Convocatória</h3>
                          <div className="space-y-3">
@@ -398,7 +309,7 @@ const TrainingDetailsModal = ({
                                                 ${attendance[p.id] === AttendanceStatus.WORK_SCHOOL ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}
                                             `}
                                          >
-                                             {Object.values(AttendanceStatus).map(s => (
+                                             {(Object.values(AttendanceStatus) as string[]).map(s => (
                                                  <option key={s} value={s}>{s}</option>
                                              ))}
                                          </select>
@@ -556,7 +467,7 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
                                                         ${localMatch.playerStatus?.[p.id] === MatchSelectionStatus.UNAVAILABLE ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-slate-200 text-slate-600'}
                                                     `}
                                                 >
-                                                    {Object.values(MatchSelectionStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                                                    {(Object.values(MatchSelectionStatus) as string[]).map(s => <option key={s} value={s}>{s}</option>)}
                                                 </select>
                                             </td>
                                         </tr>
@@ -1348,15 +1259,27 @@ const AICoachView = () => {
     const chatRef = useRef<any>(null);
 
     useEffect(() => {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        chatRef.current = ai.chats.create({ 
-            model: 'gemini-3-flash-preview', 
-            config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
-        });
+        const apiKey = (window as any).process?.env?.API_KEY || process.env.API_KEY;
+        if (apiKey) {
+            try {
+                const ai = new GoogleGenAI({ apiKey });
+                chatRef.current = ai.chats.create({ 
+                    model: 'gemini-3-flash-preview', 
+                    config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
+                });
+            } catch (e) {
+                console.error("Erro ao inicializar IA", e);
+            }
+        }
     }, []);
 
     const send = async () => {
         if(!input.trim()) return;
+        
+        if (!chatRef.current) {
+             setMessages(p => [...p, { role: 'model', text: '⚠️ Erro: API Key não configurada ou inválida.' }]);
+             return;
+        }
 
         const msg = input;
         setInput('');

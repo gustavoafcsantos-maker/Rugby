@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { 
-  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDownload, IconDatabase, IconSettings, IconCloud, IconCopy, IconPaste
+  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDownload, IconDatabase, IconSettings, IconCloud, IconCopy, IconPaste, IconInfo
 } from './components/Icons';
 import { 
   Player, Position, PlayerStatus, TrainingSession, Match, ViewState, AttendanceStatus, MatchSelectionStatus
@@ -601,17 +601,26 @@ const DataManagementView = ({
         binId: cloudConfig?.binId || '' 
     });
     
+    // Derived state for the link, updated immediately on input change
     const [magicLink, setMagicLink] = useState('');
 
+    // Function to generate link based on current INPUTS (jsonBinConfig), not just saved state
+    useEffect(() => {
+        if (jsonBinConfig.apiKey && jsonBinConfig.binId) {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const params = new URLSearchParams();
+            params.set('binId', jsonBinConfig.binId);
+            params.set('apiKey', jsonBinConfig.apiKey);
+            setMagicLink(`${baseUrl}?${params.toString()}`);
+        } else {
+            setMagicLink('');
+        }
+    }, [jsonBinConfig]);
+
+    // Keep inputs in sync if cloudConfig updates externally (e.g. initial load)
     useEffect(() => {
         if (cloudConfig) {
             setJsonBinConfig(cloudConfig);
-            // Generate Magic Link
-            const baseUrl = window.location.origin + window.location.pathname;
-            const params = new URLSearchParams();
-            params.set('binId', cloudConfig.binId);
-            params.set('apiKey', cloudConfig.apiKey); // Encode if safer, but raw for now
-            setMagicLink(`${baseUrl}?${params.toString()}`);
         }
     }, [cloudConfig]);
 
@@ -625,6 +634,7 @@ const DataManagementView = ({
     };
 
     const handleCopyLink = () => {
+        if (!magicLink) return;
         navigator.clipboard.writeText(magicLink);
         alert("Link copiado! Guarde-o ou envie para os seus outros dispositivos.");
     };
@@ -684,14 +694,27 @@ const DataManagementView = ({
                             >
                                 {cloudConfig ? 'Atualizar Configuração' : 'Ativar Sincronização'}
                             </button>
+
+                            <details className="mt-4 text-xs text-slate-500 cursor-pointer group">
+                                <summary className="flex items-center gap-1 font-medium hover:text-indigo-600 transition-colors">
+                                    <IconInfo className="w-3 h-3" />
+                                    Onde encontro estas chaves?
+                                </summary>
+                                <div className="mt-2 pl-2 border-l-2 border-slate-200 space-y-2 bg-slate-50 p-2 rounded-r-lg">
+                                    <p>1. Vá a <a href="https://jsonbin.io" target="_blank" className="text-indigo-600 underline">jsonbin.io</a> e faça login.</p>
+                                    <p>2. Clique em <strong>+ Create New</strong> e guarde um JSON vazio <code>{"{}"}</code>.</p>
+                                    <p>3. O <strong>Bin ID</strong> aparece no topo (ex: <code>67ab...</code>).</p>
+                                    <p>4. Vá ao seu perfil → <strong>API Keys</strong> → <strong>Create New</strong> para obter a <strong>X-Master-Key</strong>.</p>
+                                </div>
+                            </details>
                         </div>
                     </div>
                 </Card>
 
                 {/* 2. Magic Link */}
-                <Card className={`border-l-4 ${cloudConfig ? 'border-purple-500' : 'border-slate-200 opacity-50 pointer-events-none'}`}>
+                <Card className={`border-l-4 ${magicLink ? 'border-purple-500' : 'border-slate-200'}`}>
                     <div className="flex items-start gap-4">
-                        <div className="p-3 bg-purple-100 rounded-lg text-purple-600">
+                        <div className={`p-3 rounded-lg ${magicLink ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-400'}`}>
                             <IconCopy className="w-6 h-6" />
                         </div>
                         <div className="flex-1">
@@ -701,15 +724,20 @@ const DataManagementView = ({
                                 Sempre que abrir este link, os seus dados serão carregados automaticamente.
                             </p>
                             
-                            {magicLink && (
+                            {magicLink ? (
                                 <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-4 break-all text-xs font-mono text-slate-600">
                                     {magicLink}
+                                </div>
+                            ) : (
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-4 text-xs font-mono text-slate-400 italic">
+                                    Preencha as chaves à esquerda para gerar o link...
                                 </div>
                             )}
 
                             <button 
                                 onClick={handleCopyLink}
-                                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                disabled={!magicLink}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${magicLink ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
                             >
                                 <IconCopy className="w-4 h-4" />
                                 Copiar Link Mágico

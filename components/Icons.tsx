@@ -8,14 +8,20 @@ import {
   Plus, 
   Trash2, 
   CheckCircle, 
-  XCircle,
-  AlertCircle,
-  ChevronRight,
-  UserPlus,
-  Edit2,
-  Clock,
-  Shield,
-  Upload
+  XCircle, 
+  AlertCircle, 
+  ChevronRight, 
+  UserPlus, 
+  Edit2, 
+  Clock, 
+  Shield, 
+  Upload,
+  Download,
+  Database,
+  Settings,
+  Cloud,
+  Copy,
+  ClipboardPaste
 } from 'lucide-react';
 
 export const IconUsers = ({ className }: { className?: string }) => <Users className={className} />;
@@ -34,3 +40,9 @@ export const IconEdit = ({ className }: { className?: string }) => <Edit2 classN
 export const IconClock = ({ className }: { className?: string }) => <Clock className={className} />;
 export const IconShield = ({ className }: { className?: string }) => <Shield className={className} />;
 export const IconUpload = ({ className }: { className?: string }) => <Upload className={className} />;
+export const IconDownload = ({ className }: { className?: string }) => <Download className={className} />;
+export const IconDatabase = ({ className }: { className?: string }) => <Database className={className} />;
+export const IconSettings = ({ className }: { className?: string }) => <Settings className={className} />;
+export const IconCloud = ({ className }: { className?: string }) => <Cloud className={className} />;
+export const IconCopy = ({ className }: { className?: string }) => <Copy className={className} />;
+export const IconPaste = ({ className }: { className?: string }) => <ClipboardPaste className={className} />;

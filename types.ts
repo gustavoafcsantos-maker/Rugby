@@ -67,4 +67,4 @@ export interface Match {
   strategy?: string;
 }
 
-export type ViewState = 'DASHBOARD' | 'ROSTER' | 'TRAINING' | 'MATCHES' | 'AI_COACH';
+export type ViewState = 'DASHBOARD' | 'ROSTER' | 'TRAINING' | 'MATCHES' | 'AI_COACH' | 'DATA';

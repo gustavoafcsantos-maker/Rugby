@@ -603,6 +603,7 @@ const DataManagementView = ({
     
     // Derived state for the link, updated immediately on input change
     const [magicLink, setMagicLink] = useState('');
+    const [isCreatingBin, setIsCreatingBin] = useState(false);
 
     // Function to generate link based on current INPUTS (jsonBinConfig), not just saved state
     useEffect(() => {
@@ -631,6 +632,44 @@ const DataManagementView = ({
         }
         onSetCloudConfig(jsonBinConfig);
         alert("Configuração guardada! A aplicação agora sincroniza automaticamente.");
+    };
+
+    const handleAutoCreateBin = async () => {
+        if (!jsonBinConfig.apiKey) {
+            alert("Por favor, cole a sua X-Master-Key primeiro.");
+            return;
+        }
+        
+        setIsCreatingBin(true);
+        try {
+            const response = await fetch('https://api.jsonbin.io/v3/b', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': jsonBinConfig.apiKey,
+                    'X-Bin-Name': 'RugbyManager_Data'
+                },
+                body: JSON.stringify({ 
+                    info: "Initial Rugby Manager Data",
+                    players: players, 
+                    created_at: new Date().toISOString()
+                })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok && data.metadata && data.metadata.id) {
+                setJsonBinConfig(prev => ({ ...prev, binId: data.metadata.id }));
+                alert("Bin criado com sucesso! O ID foi preenchido automaticamente. Clique em 'Ativar Sincronização'.");
+            } else {
+                console.error("Erro ao criar bin:", data);
+                alert("Erro ao criar Bin. Verifique se a sua Key está correta.\nErro: " + (data.message || 'Desconhecido'));
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erro de conexão ao JSONBin.io");
+        }
+        setIsCreatingBin(false);
     };
 
     const handleCopyLink = () => {
@@ -662,12 +701,12 @@ const DataManagementView = ({
                                 {cloudConfig && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">Ativo</span>}
                             </h3>
                             <p className="text-slate-600 text-sm mt-1 mb-4">
-                                Crie uma conta em <a href="https://jsonbin.io" target="_blank" className="text-blue-600 underline">jsonbin.io</a>, crie um "Bin" privado e cole as chaves aqui.
+                                Crie uma conta em <a href="https://jsonbin.io" target="_blank" className="text-blue-600 underline">jsonbin.io</a>, obtenha a sua API Key e cole-a aqui.
                             </p>
                             
                             <div className="grid gap-4 mb-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">X-Master-Key</label>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">X-Master-Key (API Key)</label>
                                     <input 
                                         type="password" 
                                         value={jsonBinConfig.apiKey}
@@ -675,16 +714,28 @@ const DataManagementView = ({
                                         className="w-full px-3 py-2 border rounded-md text-sm"
                                         placeholder="Ex: $2b$10$..."
                                     />
+                                    <p className="text-[10px] text-slate-400 mt-1">Encontre em: Profile Avatar &gt; API Keys &gt; Create New</p>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Bin ID</label>
-                                    <input 
-                                        type="text" 
-                                        value={jsonBinConfig.binId}
-                                        onChange={e => setJsonBinConfig({...jsonBinConfig, binId: e.target.value})}
-                                        className="w-full px-3 py-2 border rounded-md text-sm"
-                                        placeholder="Ex: 67ab..."
-                                    />
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={jsonBinConfig.binId}
+                                            onChange={e => setJsonBinConfig({...jsonBinConfig, binId: e.target.value})}
+                                            className="w-full px-3 py-2 border rounded-md text-sm"
+                                            placeholder="Ex: 67ab..."
+                                        />
+                                        <button 
+                                            onClick={handleAutoCreateBin}
+                                            disabled={isCreatingBin || !jsonBinConfig.apiKey}
+                                            className="shrink-0 px-3 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
+                                            title="Cria um Bin vazio automaticamente usando a sua Key"
+                                        >
+                                            {isCreatingBin ? 'A criar...' : 'Gerar ID'}
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">Cole um ID existente ou clique em "Gerar ID" para criar um novo.</p>
                                 </div>
                             </div>
 
@@ -698,13 +749,13 @@ const DataManagementView = ({
                             <details className="mt-4 text-xs text-slate-500 cursor-pointer group">
                                 <summary className="flex items-center gap-1 font-medium hover:text-indigo-600 transition-colors">
                                     <IconInfo className="w-3 h-3" />
-                                    Onde encontro estas chaves?
+                                    Como fazer manualmente?
                                 </summary>
                                 <div className="mt-2 pl-2 border-l-2 border-slate-200 space-y-2 bg-slate-50 p-2 rounded-r-lg">
                                     <p>1. Vá a <a href="https://jsonbin.io" target="_blank" className="text-indigo-600 underline">jsonbin.io</a> e faça login.</p>
-                                    <p>2. Clique em <strong>+ Create New</strong>. No painel central, escreva <code>{"{}"}</code> (chavetas vazias) no editor. <strong>É obrigatório</strong> ter conteúdo para guardar.</p>
-                                    <p>3. Clique no ícone de disquete (Save). O <strong>Bin ID</strong> aparece no topo (ex: <code>67ab...</code>).</p>
-                                    <p>4. Vá ao seu perfil → <strong>API Keys</strong> → <strong>Create New</strong> para obter a <strong>X-Master-Key</strong>.</p>
+                                    <p>2. Clique em <strong>+ Create New</strong>.</p>
+                                    <p>3. <strong>IMPORTANTE:</strong> Escreva <code>{`{"dados": "inicio"}`}</code> no editor. O JSONBin proíbe Bins vazios.</p>
+                                    <p>4. Clique no ícone de disquete (Save). Copie o <strong>Bin ID</strong> do topo.</p>
                                 </div>
                             </details>
                         </div>

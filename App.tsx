@@ -1097,8 +1097,6 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
     );
 };
 
-// --- Missing Views & Main App ---
-
 const TrainingView = ({ trainings, players, addTraining, updateTraining }: { trainings: TrainingSession[], players: Player[], addTraining: (t: TrainingSession) => void, updateTraining: (t: TrainingSession) => void }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newDate, setNewDate] = useState('');
@@ -1350,31 +1348,25 @@ const AICoachView = () => {
     const chatRef = useRef<any>(null);
 
     useEffect(() => {
-        // Safe API Key access
-        const apiKey = (window as any).process?.env?.API_KEY;
-        if (apiKey) {
-            const ai = new GoogleGenAI({ apiKey });
-            chatRef.current = ai.chats.create({ 
-                model: 'gemini-3-flash-preview', 
-                config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
-            });
-        }
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        chatRef.current = ai.chats.create({ 
+            model: 'gemini-3-flash-preview', 
+            config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
+        });
     }, []);
 
     const send = async () => {
         if(!input.trim()) return;
+
         const msg = input;
         setInput('');
         setMessages(p => [...p, { role: 'user', text: msg }]);
         setLoading(true);
         try {
-            if (!chatRef.current) {
-                setMessages(p => [...p, { role: 'model', text: 'Erro: API Key não encontrada. Configure no index.html.' }]);
-            } else {
-                const res = await chatRef.current.sendMessage({ message: msg });
-                setMessages(p => [...p, { role: 'model', text: res.text }]);
-            }
+            const res = await chatRef.current.sendMessage({ message: msg });
+            setMessages(p => [...p, { role: 'model', text: res.text }]);
         } catch(e) {
+            console.error(e);
             setMessages(p => [...p, { role: 'model', text: 'Desculpe, ocorreu um erro ao contactar a IA.' }]);
         }
         setLoading(false);
@@ -1382,7 +1374,7 @@ const AICoachView = () => {
 
     return (
         <Card className="h-[calc(100vh-8rem)] flex flex-col p-0 overflow-hidden">
-            <div className="bg-slate-50 p-4 border-b border-slate-200">
+            <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                     <IconBrain className="w-5 h-5 text-indigo-600" />
                     Assistente Técnico AI
@@ -1413,6 +1405,7 @@ const AICoachView = () => {
                     onKeyDown={e => e.key === 'Enter' && send()}
                     className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Escreve uma mensagem..."
+                    disabled={loading}
                 />
                 <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled={loading}>
                     Enviar

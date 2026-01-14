@@ -3,24 +3,13 @@ import { Player, Position, Match, TrainingSession } from '../types';
 
 const MODEL_NAME = 'gemini-3-flash-preview';
 
-// Função segura para obter a API Key sem causar erro se 'process' não existir
-const getApiKey = (): string => {
-  if (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
-    return (window as any).process.env.API_KEY;
-  }
-  return "";
-};
-
 export const generateTrainingPlan = async (
   playerCount: number,
   recentFocus: string,
   positions: string[]
 ): Promise<string> => {
   try {
-    const apiKey = getApiKey();
-    if (!apiKey) return "API Key em falta. Configure no index.html.";
-
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
       Atuo como treinador de rugby.
@@ -55,10 +44,7 @@ export const generateMatchStrategy = async (
   location: string
 ): Promise<string> => {
   try {
-    const apiKey = getApiKey();
-    if (!apiKey) return "API Key em falta. Configure no index.html.";
-
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const forwards = squad.filter(p => [Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));
     const backs = squad.filter(p => ![Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));

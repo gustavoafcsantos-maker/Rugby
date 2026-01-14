@@ -398,7 +398,7 @@ const TrainingDetailsModal = ({
                                                 ${attendance[p.id] === AttendanceStatus.WORK_SCHOOL ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}
                                             `}
                                          >
-                                             {Object.values(AttendanceStatus).map(s => (
+                                             {(Object.values(AttendanceStatus) as string[]).map(s => (
                                                  <option key={s} value={s}>{s}</option>
                                              ))}
                                          </select>
@@ -556,7 +556,7 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
                                                         ${localMatch.playerStatus?.[p.id] === MatchSelectionStatus.UNAVAILABLE ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-slate-200 text-slate-600'}
                                                     `}
                                                 >
-                                                    {Object.values(MatchSelectionStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                                                    {(Object.values(MatchSelectionStatus) as string[]).map(s => <option key={s} value={s}>{s}</option>)}
                                                 </select>
                                             </td>
                                         </tr>

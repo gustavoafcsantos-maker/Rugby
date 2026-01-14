@@ -1,0 +1,5 @@
+{
+  "name": "RugbyManager AI",
+  "description": "Uma aplicação completa para gestão de equipas de Rugby. Gerencie o plantel, registe presenças em treinos, crie convocatórias para jogos e obtenha conselhos táticos via IA.",
+  "requestFramePermissions": []
+}

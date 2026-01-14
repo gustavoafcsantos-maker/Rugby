@@ -14,6 +14,26 @@ import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI } from "@google/genai";
 import * as XLSX from 'xlsx';
 
+// --- Helper Functions for Persistence ---
+const loadState = <T,>(key: string, fallback: T): T => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved === null) return fallback;
+    return JSON.parse(saved);
+  } catch (e) {
+    console.error(`Erro ao carregar ${key}:`, e);
+    return fallback;
+  }
+};
+
+const saveState = <T,>(key: string, data: T) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error(`Erro ao guardar ${key}:`, e);
+  }
+};
+
 // --- Helper Components ---
 const StatusBadge = ({ status }: { status: PlayerStatus }) => {
   const colors = {
@@ -53,7 +73,6 @@ const PlayerDetailsModal = ({
   const [activeTab, setActiveTab] = useState<'details' | 'stats'>('details');
 
   // --- Statistics Calculation ---
-  
   const playerTrainings = trainings.filter(t => t.attendance[player.id]);
   const totalTrainings = playerTrainings.length;
   const presentCount = playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.PRESENT).length;
@@ -233,8 +252,7 @@ const PlayerDetailsModal = ({
   );
 };
 
-// --- New Component: Training Details Modal ---
-
+// --- Training Details Modal ---
 const TrainingDetailsModal = ({ 
     training, 
     players, 
@@ -248,7 +266,6 @@ const TrainingDetailsModal = ({
 }) => {
     const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>(training.attendance || {});
 
-    // Ensure all players are in the attendance object (for new players added after training creation)
     useEffect(() => {
         const newAttendance = { ...attendance };
         let changed = false;
@@ -332,8 +349,7 @@ const TrainingDetailsModal = ({
     );
 };
 
-// --- New Component: Match Details Modal ---
-
+// --- Match Details Modal ---
 const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, players: Player[], onClose: () => void, onSave: (m: Match) => void }) => {
     const [activeTab, setActiveTab] = useState<'selection' | 'lineup' | 'strategy'>('selection');
     const [localMatch, setLocalMatch] = useState<Match>(match);
@@ -348,7 +364,6 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
         let newXV = [...(localMatch.startingXV || [])];
         let newSubs = [...(localMatch.subs || [])];
         
-        // Remove from Lineup if not selected
         if (status !== MatchSelectionStatus.SELECTED) {
             newXV = newXV.map(id => id === playerId ? '' : id);
             newSubs = newSubs.filter(id => id !== playerId);
@@ -359,15 +374,11 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     const handleLineupChange = (index: number, playerId: string, isSub: boolean = false) => {
         if (isSub) {
              const newSubs = [...(localMatch.subs || [])];
-             // Remove if exists elsewhere in subs
              const existingIdx = newSubs.indexOf(playerId);
              if (existingIdx !== -1) newSubs.splice(existingIdx, 1);
              
-             // Ensure array size logic if needed, but for subs usually just push/pop. 
-             // Let's implement fixed slots for subs 16-23 (8 slots)
              while(newSubs.length < 8) newSubs.push('');
              
-             // Check if in XV
              const xvIdx = (localMatch.startingXV || []).indexOf(playerId);
              if (xvIdx !== -1) {
                   const newXV = [...(localMatch.startingXV || [])];
@@ -378,15 +389,12 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
              newSubs[index] = playerId;
              updateMatch({ subs: newSubs });
         } else {
-            // XV Logic
             const newXV = [...(localMatch.startingXV || [])];
             while(newXV.length < 15) newXV.push('');
             
-            // Remove from other XV slot
             const existingXVIdx = newXV.indexOf(playerId);
             if (existingXVIdx !== -1 && existingXVIdx !== index) newXV[existingXVIdx] = '';
             
-            // Remove from Subs
             let newSubs = [...(localMatch.subs || [])];
             if (newSubs.includes(playerId)) {
                 newSubs = newSubs.filter(id => id !== playerId);
@@ -721,14 +729,12 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                // Obter dados como array de arrays para facilitar processamento
                 const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
                 processData(rows);
             } catch (error) {
                 console.error("Erro ao processar ficheiro:", error);
                 alert("Erro ao ler o ficheiro. Certifique-se que não está corrompido.");
             } finally {
-                // Limpar o input para permitir carregar o mesmo ficheiro novamente se necessário
                 if (fileInputRef.current) fileInputRef.current.value = '';
             }
         };
@@ -741,12 +747,9 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
             return;
         }
 
-        // Especificação do utilizador: Cabeçalho na linha 3 (index 2)
         const HEADER_ROW_INDEX = 2;
-        // Dados começam na linha 4 (index 3)
         const DATA_START_INDEX = 3; 
 
-        // Safe header processing
         const headerRow = rows[HEADER_ROW_INDEX];
         if (!headerRow) {
              alert("Linha de cabeçalho (linha 3) não encontrada.");
@@ -754,28 +757,20 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
         }
 
         const headers: string[] = [];
-        // Use loop to handle sparse arrays correctly
         for (let i = 0; i < headerRow.length; i++) {
             const val = headerRow[i];
             headers.push(val ? String(val).toLowerCase().trim() : '');
         }
         
-        // Colunas essenciais
-        // Especificação do utilizador: Nome na coluna 3 (index 2 - considerando A=0, B=1, C=2)
         const nameIdx = 2;
         
-        // Helper para encontrar colunas ignorando 2024 e preferindo 2025
         const findCol = (terms: string[]) => {
-            // 1. Tentar encontrar com termo E "2025"
             let idx = headers.findIndex(h => terms.some(t => h.includes(t)) && h.includes('2025'));
             if (idx !== -1) return idx;
-            
-            // 2. Tentar encontrar com termo MAS SEM "2024"
             idx = headers.findIndex(h => terms.some(t => h.includes(t)) && !h.includes('2024'));
             return idx;
         };
 
-        // Mapeamento opcional
         const birthDateIdx = findCol(['nascimento', 'data', 'birth']);
         const heightIdx = findCol(['altura', 'height']);
         const weightIdx = findCol(['peso', 'weight']);
@@ -784,22 +779,17 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
 
         let addedCount = 0;
         
-        // Loop a começar na linha especificada
         for (let i = DATA_START_INDEX; i < rows.length; i++) {
             const row = rows[i];
             if (!row) continue;
             
-            // Validar se existe nome na coluna especificada (coluna 3 -> index 2)
             const name = String(row[nameIdx] || '').trim();
             if (!name) continue;
 
-            // Date Parsing
             let birthDate = undefined;
             if (birthDateIdx !== -1) {
                 const rawDate = row[birthDateIdx];
-                // SheetJS por vezes retorna números para datas (Excel serial date)
                 if (typeof rawDate === 'string') {
-                    // Tentar formatos comuns DD/MM/YYYY ou YYYY-MM-DD
                     if (rawDate.includes('/')) {
                         const parts = rawDate.trim().split('/');
                         if (parts.length === 3) birthDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -809,13 +799,12 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 }
             }
 
-            // Stats Parsing
             let finalHeight = undefined;
             if (heightIdx !== -1) {
                 const rawHeight = row[heightIdx];
                 if (rawHeight) {
                     const h = parseFloat(String(rawHeight).replace(',', '.'));
-                    if (!isNaN(h)) finalHeight = h < 3 ? h * 100 : h; // Converter metros para cm
+                    if (!isNaN(h)) finalHeight = h < 3 ? h * 100 : h;
                 }
             }
 
@@ -828,7 +817,6 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 }
             }
 
-            // Position Inference
             let position = Position.WING; 
             const posRaw = posIdx !== -1 ? (String(row[posIdx] || '')).toUpperCase() : '';
             
@@ -845,7 +833,6 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                  else if (posRaw.includes('PONTA') || posRaw.includes('WING')) position = Position.WING;
                  else if (posRaw.includes('ARREIO') || posRaw.includes('FULL')) position = Position.FULLBACK;
             } else {
-                 // Heurística básica se não houver posição
                  const w = finalWeight || 75;
                  const h = finalHeight || 175;
                  if (w > 100) position = Position.PROP;
@@ -1019,7 +1006,6 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
     e.preventDefault();
     if (!newDate || !newFocus) return;
 
-    // Initialize attendance for all players
     const attendance: Record<string, AttendanceStatus> = {};
     players.forEach(p => attendance[p.id] = AttendanceStatus.PRESENT);
 
@@ -1043,7 +1029,7 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
       training.focus,
       players.map(p => p.position)
     );
-    alert(plan); // Placeholder for viewing plan
+    alert(plan);
     setLoadingPlan(false);
   };
   
@@ -1136,7 +1122,7 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
             opponent: newMatchData.opponent,
             date: newMatchData.date,
             location: newMatchData.location,
-            playerStatus: {}, // Default empty, can auto-fill with Available
+            playerStatus: {}, 
             startingXV: Array(15).fill(''),
             subs: [],
             playingTime: {}
@@ -1377,34 +1363,15 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
 const App = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
   
-  // --- STATE INITIALIZATION WITH PERSISTENCE ---
-  const [players, setPlayers] = useState<Player[]>(() => {
-    const saved = localStorage.getItem('rugby_manager_players');
-    return saved ? JSON.parse(saved) : INITIAL_PLAYERS;
-  });
-  
-  const [trainings, setTrainings] = useState<TrainingSession[]>(() => {
-    const saved = localStorage.getItem('rugby_manager_trainings');
-    return saved ? JSON.parse(saved) : INITIAL_TRAININGS;
-  });
-  
-  const [matches, setMatches] = useState<Match[]>(() => {
-    const saved = localStorage.getItem('rugby_manager_matches');
-    return saved ? JSON.parse(saved) : INITIAL_MATCHES;
-  });
+  // --- STATE INITIALIZATION WITH PERSISTENCE (ROBUST) ---
+  const [players, setPlayers] = useState<Player[]>(() => loadState('rugby_manager_players', INITIAL_PLAYERS));
+  const [trainings, setTrainings] = useState<TrainingSession[]>(() => loadState('rugby_manager_trainings', INITIAL_TRAININGS));
+  const [matches, setMatches] = useState<Match[]>(() => loadState('rugby_manager_matches', INITIAL_MATCHES));
 
   // --- PERSISTENCE EFFECTS ---
-  useEffect(() => {
-    localStorage.setItem('rugby_manager_players', JSON.stringify(players));
-  }, [players]);
-
-  useEffect(() => {
-    localStorage.setItem('rugby_manager_trainings', JSON.stringify(trainings));
-  }, [trainings]);
-
-  useEffect(() => {
-    localStorage.setItem('rugby_manager_matches', JSON.stringify(matches));
-  }, [matches]);
+  useEffect(() => { saveState('rugby_manager_players', players); }, [players]);
+  useEffect(() => { saveState('rugby_manager_trainings', trainings); }, [trainings]);
+  useEffect(() => { saveState('rugby_manager_matches', matches); }, [matches]);
 
   // --- ACTIONS ---
   const addPlayer = (p: Player) => setPlayers(prev => [...prev, p]);
@@ -1422,7 +1389,6 @@ const App = () => {
       <Sidebar view={view} setView={setView} />
       <main className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto min-h-full">
-            {/* Mobile Nav Toggle could go here */}
             <div className="md:hidden mb-4 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
                  <h1 className="font-bold text-slate-800">Rugby Manager</h1>
                  <select 

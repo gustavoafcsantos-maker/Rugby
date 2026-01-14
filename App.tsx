@@ -702,8 +702,8 @@ const DataManagementView = ({
                                 </summary>
                                 <div className="mt-2 pl-2 border-l-2 border-slate-200 space-y-2 bg-slate-50 p-2 rounded-r-lg">
                                     <p>1. Vá a <a href="https://jsonbin.io" target="_blank" className="text-indigo-600 underline">jsonbin.io</a> e faça login.</p>
-                                    <p>2. Clique em <strong>+ Create New</strong> e guarde um JSON vazio <code>{"{}"}</code>.</p>
-                                    <p>3. O <strong>Bin ID</strong> aparece no topo (ex: <code>67ab...</code>).</p>
+                                    <p>2. Clique em <strong>+ Create New</strong>. No painel central, escreva <code>{"{}"}</code> (chavetas vazias) no editor. <strong>É obrigatório</strong> ter conteúdo para guardar.</p>
+                                    <p>3. Clique no ícone de disquete (Save). O <strong>Bin ID</strong> aparece no topo (ex: <code>67ab...</code>).</p>
                                     <p>4. Vá ao seu perfil → <strong>API Keys</strong> → <strong>Create New</strong> para obter a <strong>X-Master-Key</strong>.</p>
                                 </div>
                             </details>

@@ -6,6 +6,16 @@
     <title>RugbyManager AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      // POLYFILL PARA EVITAR QUE A APP CRASHE (ECRÃ BRANCO)
+      // Se não houver process.env (navegador), cria um vazio.
+      window.process = window.process || {
+        env: {
+          // COLA A TUA CHAVE API AQUI ENTRE AS ASPAS SE ESTIVERES A RODAR LOCALMENTE
+          API_KEY: "" 
+        }
+      };
+    </script>
     <style>
       body {
         font-family: 'Inter', sans-serif;

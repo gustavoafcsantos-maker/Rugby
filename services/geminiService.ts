@@ -1,8 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { Player, Position, Match, TrainingSession } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const MODEL_NAME = 'gemini-3-flash-preview';
 
 export const generateTrainingPlan = async (
@@ -11,6 +9,9 @@ export const generateTrainingPlan = async (
   positions: string[]
 ): Promise<string> => {
   try {
+    // Inicialização movida para dentro da função para evitar crashes no load se a key não existir
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
     const prompt = `
       Atuo como treinador de rugby.
       Tenho ${playerCount} jogadores confirmados para o treino de hoje.
@@ -34,7 +35,7 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico. Verifique a chave da API.";
+    return "Erro ao contactar o assistente técnico. Verifique se configurou a API Key no index.html ou nas variáveis de ambiente.";
   }
 };
 
@@ -44,6 +45,9 @@ export const generateMatchStrategy = async (
   location: string
 ): Promise<string> => {
   try {
+    // Inicialização movida para dentro da função
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
     const forwards = squad.filter(p => [Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));
     const backs = squad.filter(p => ![Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));
 
@@ -73,6 +77,6 @@ export const generateMatchStrategy = async (
     return response.text || "Não foi possível gerar a estratégia.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico.";
+    return "Erro ao contactar o assistente técnico. Verifique a chave da API.";
   }
 };

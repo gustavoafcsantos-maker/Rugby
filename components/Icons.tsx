@@ -22,7 +22,8 @@ import {
   Cloud,
   Copy,
   ClipboardPaste,
-  Info
+  Info,
+  RefreshCw
 } from 'lucide-react';
 
 export const IconUsers = ({ className }: { className?: string }) => <Users className={className} />;
@@ -48,3 +49,4 @@ export const IconCloud = ({ className }: { className?: string }) => <Cloud class
 export const IconCopy = ({ className }: { className?: string }) => <Copy className={className} />;
 export const IconPaste = ({ className }: { className?: string }) => <ClipboardPaste className={className} />;
 export const IconInfo = ({ className }: { className?: string }) => <Info className={className} />;
+export const IconRefresh = ({ className }: { className?: string }) => <RefreshCw className={className} />;

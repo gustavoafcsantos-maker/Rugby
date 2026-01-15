@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { 
-  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDownload, IconDatabase, IconSettings, IconCloud, IconCopy, IconPaste, IconInfo
+  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDownload, IconDatabase, IconSettings, IconCloud, IconCopy, IconPaste, IconInfo, IconRefresh
 } from './components/Icons';
 import { 
   Player, Position, PlayerStatus, TrainingSession, Match, ViewState, AttendanceStatus, MatchSelectionStatus
@@ -776,9 +776,15 @@ const DataManagementView = ({
                             </p>
                             
                             {magicLink ? (
-                                <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-4 break-all text-xs font-mono text-slate-600">
-                                    {magicLink}
-                                </div>
+                                <>
+                                    <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-2 break-all text-xs font-mono text-slate-600">
+                                        {magicLink}
+                                    </div>
+                                    <p className="text-xs text-emerald-600 font-medium mb-4 flex items-center gap-1">
+                                        <IconCheck className="w-3 h-3" />
+                                        O link é permanente. Não muda ao editar dados.
+                                    </p>
+                                </>
                             ) : (
                                 <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-4 text-xs font-mono text-slate-400 italic">
                                     Preencha as chaves à esquerda para gerar o link...
@@ -1604,8 +1610,34 @@ const App = () => {
   const [players, setPlayers] = useState<Player[]>(() => loadState('rugby_manager_players', INITIAL_PLAYERS));
   const [trainings, setTrainings] = useState<TrainingSession[]>(() => loadState('rugby_manager_trainings', INITIAL_TRAININGS));
   const [matches, setMatches] = useState<Match[]>(() => loadState('rugby_manager_matches', INITIAL_MATCHES));
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // --- AUTO-LOAD FROM URL OR CLOUD ---
+  const loadFromCloud = useCallback(async (activeConfig = cloudConfig) => {
+      if (!activeConfig) return;
+      
+      setIsSyncing(true);
+      try {
+          console.log("A carregar dados da nuvem...");
+          const res = await fetch(`https://api.jsonbin.io/v3/b/${activeConfig.binId}/latest`, {
+              headers: { 'X-Master-Key': activeConfig.apiKey }
+          });
+          if (!res.ok) throw new Error("Falha na cloud");
+          const json = await res.json();
+          const data = json.record;
+          
+          // Simple strategy: Overwrite local if cloud exists
+          if (data.players) setPlayers(data.players);
+          if (data.trainings) setTrainings(data.trainings);
+          if (data.matches) setMatches(data.matches);
+          console.log("Dados sincronizados com sucesso!");
+      } catch (e) {
+          console.error("Erro ao sincronizar:", e);
+      } finally {
+          setIsSyncing(false);
+      }
+  }, [cloudConfig]);
+
   useEffect(() => {
       const initCloud = async () => {
           // 1. Check URL Params (Priority)
@@ -1613,36 +1645,15 @@ const App = () => {
           const urlBinId = params.get('binId');
           const urlApiKey = params.get('apiKey');
 
-          let activeConfig = cloudConfig;
-
           if (urlBinId && urlApiKey) {
               const newConfig = { apiKey: urlApiKey, binId: urlBinId };
               setCloudConfig(newConfig);
-              activeConfig = newConfig;
               // Persist locally too so it works on refresh without params
               localStorage.setItem('jsonbin_api_key', urlApiKey);
               localStorage.setItem('jsonbin_bin_id', urlBinId);
-          }
-
-          // 2. Fetch Data if Config Exists
-          if (activeConfig) {
-              try {
-                  console.log("A carregar dados da nuvem...");
-                  const res = await fetch(`https://api.jsonbin.io/v3/b/${activeConfig.binId}/latest`, {
-                      headers: { 'X-Master-Key': activeConfig.apiKey }
-                  });
-                  if (!res.ok) throw new Error("Falha na cloud");
-                  const json = await res.json();
-                  const data = json.record;
-                  
-                  // Simple strategy: Overwrite local if cloud exists
-                  if (data.players) setPlayers(data.players);
-                  if (data.trainings) setTrainings(data.trainings);
-                  if (data.matches) setMatches(data.matches);
-                  console.log("Dados sincronizados com sucesso!");
-              } catch (e) {
-                  console.error("Erro ao sincronizar:", e);
-              }
+              loadFromCloud(newConfig);
+          } else if (cloudConfig) {
+              loadFromCloud(cloudConfig);
           }
       };
       initCloud();
@@ -1661,6 +1672,9 @@ const App = () => {
   useEffect(() => {
       const syncToCloud = async () => {
           if (!cloudConfig) return;
+          // Avoid auto-saving empty initial states over existing cloud data
+          if (debouncedPlayers.length === 0 && debouncedTrainings.length === 0 && debouncedMatches.length === 0) return;
+
           try {
               const data = { 
                   players: debouncedPlayers, 
@@ -1720,12 +1734,23 @@ const App = () => {
                  </div>
                  
                  {/* Cloud Status Indicator (Desktop) */}
-                 <div className="hidden md:flex items-center gap-2 ml-auto">
+                 <div className="hidden md:flex items-center gap-4 ml-auto">
                     {cloudConfig ? (
-                        <span className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium animate-pulse">
-                            <IconCloud className="w-3 h-3" />
-                            Sincronização Ativa
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={() => loadFromCloud()} 
+                                disabled={isSyncing}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-medium transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                                title="Forçar atualização da Cloud"
+                            >
+                                <IconRefresh className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
+                                {isSyncing ? 'A Sincronizar...' : 'Sincronizar Agora'}
+                            </button>
+                            <span className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                <IconCloud className="w-3 h-3" />
+                                Online
+                            </span>
+                        </div>
                     ) : (
                         <button onClick={() => setView('DATA')} className="flex items-center gap-2 px-3 py-1 bg-slate-200 text-slate-600 hover:bg-slate-300 rounded-full text-xs font-medium transition-colors">
                             <IconCloud className="w-3 h-3" />
@@ -1750,6 +1775,7 @@ const App = () => {
                     setCloudConfig(cfg);
                     localStorage.setItem('jsonbin_api_key', cfg.apiKey);
                     localStorage.setItem('jsonbin_bin_id', cfg.binId);
+                    loadFromCloud(cfg);
                 }}
             />
           )}

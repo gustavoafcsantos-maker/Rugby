@@ -582,6 +582,239 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     );
 };
 
+// --- Data Management View (RESTORED) ---
+const DataManagementView = ({ 
+    players, 
+    trainings, 
+    matches, 
+    onSetCloudConfig,
+    cloudConfig,
+    onDisconnect
+}: { 
+    players: Player[], 
+    trainings: TrainingSession[], 
+    matches: Match[],
+    onSetCloudConfig: (config: { apiKey: string, binId: string }) => void,
+    cloudConfig: { apiKey: string, binId: string } | null,
+    onDisconnect: () => void
+}) => {
+    const [jsonBinConfig, setJsonBinConfig] = useState({ 
+        apiKey: cloudConfig?.apiKey || '', 
+        binId: cloudConfig?.binId || '' 
+    });
+    
+    const [magicLink, setMagicLink] = useState('');
+    const [isCreatingBin, setIsCreatingBin] = useState(false);
+
+    useEffect(() => {
+        if (jsonBinConfig.apiKey && jsonBinConfig.binId) {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const params = new URLSearchParams();
+            params.set('binId', jsonBinConfig.binId);
+            params.set('apiKey', jsonBinConfig.apiKey);
+            setMagicLink(`${baseUrl}?${params.toString()}`);
+        } else {
+            setMagicLink('');
+        }
+    }, [jsonBinConfig]);
+
+    useEffect(() => {
+        if (cloudConfig) {
+            setJsonBinConfig(cloudConfig);
+        }
+    }, [cloudConfig]);
+
+    const handleSaveConfig = () => {
+        if (!jsonBinConfig.apiKey || !jsonBinConfig.binId) {
+            alert("Preencha ambos os campos.");
+            return;
+        }
+        onSetCloudConfig(jsonBinConfig);
+    };
+
+    const handleAutoCreateBin = async () => {
+        if (!jsonBinConfig.apiKey) {
+            alert("Por favor, cole a sua X-Master-Key primeiro.");
+            return;
+        }
+        
+        setIsCreatingBin(true);
+        try {
+            const response = await fetch('https://api.jsonbin.io/v3/b', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': jsonBinConfig.apiKey,
+                    'X-Bin-Name': 'RugbyManager_Data'
+                },
+                body: JSON.stringify({ 
+                    info: "Initial Rugby Manager Data",
+                    players: players, 
+                    created_at: new Date().toISOString()
+                })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok && data.metadata && data.metadata.id) {
+                setJsonBinConfig(prev => ({ ...prev, binId: data.metadata.id }));
+                alert("Bin criado com sucesso! O ID foi preenchido automaticamente. Clique em 'Ativar Sincronização'.");
+            } else {
+                console.error("Erro ao criar bin:", data);
+                alert("Erro ao criar Bin. Verifique se a sua Key está correta.\nErro: " + (data.message || 'Desconhecido'));
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erro de conexão ao JSONBin.io");
+        }
+        setIsCreatingBin(false);
+    };
+
+    const handleCopyLink = () => {
+        if (!magicLink) return;
+        navigator.clipboard.writeText(magicLink);
+        alert("Link copiado! Guarde-o ou envie para os seus outros dispositivos.");
+    };
+
+    return (
+        <div className="space-y-8 pb-10">
+            <div>
+                <h2 className="text-2xl font-bold text-slate-800">Sincronização Cloud</h2>
+                <p className="text-slate-500 mt-2">
+                    Ligue a sua conta gratuita JSONBin.io para ter os seus dados em qualquer lugar, automaticamente.
+                </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* 1. Setup */}
+                <Card className={`border-l-4 ${cloudConfig ? 'border-green-500' : 'border-slate-300'}`}>
+                     <div className="flex items-start gap-4">
+                        <div className={`p-3 rounded-lg ${cloudConfig ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-600'}`}>
+                            <IconCloud className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                1. Configurar Cloud
+                                {cloudConfig && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">Ativo</span>}
+                            </h3>
+                            <p className="text-slate-600 text-sm mt-1 mb-4">
+                                Crie uma conta em <a href="https://jsonbin.io" target="_blank" className="text-blue-600 underline">jsonbin.io</a>, obtenha a sua API Key e cole-a aqui.
+                            </p>
+                            
+                            <div className="grid gap-4 mb-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">X-Master-Key (API Key)</label>
+                                    <input 
+                                        type="password" 
+                                        value={jsonBinConfig.apiKey}
+                                        onChange={e => setJsonBinConfig({...jsonBinConfig, apiKey: e.target.value})}
+                                        className="w-full px-3 py-2 border rounded-md text-sm"
+                                        placeholder="Ex: $2b$10$..."
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1">Encontre em: Profile Avatar &gt; API Keys &gt; Create New</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Bin ID</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={jsonBinConfig.binId}
+                                            onChange={e => setJsonBinConfig({...jsonBinConfig, binId: e.target.value})}
+                                            className="w-full px-3 py-2 border rounded-md text-sm"
+                                            placeholder="Ex: 67ab..."
+                                        />
+                                        <button 
+                                            onClick={handleAutoCreateBin}
+                                            disabled={isCreatingBin || !jsonBinConfig.apiKey}
+                                            className="shrink-0 px-3 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
+                                            title="Cria um Bin vazio automaticamente usando a sua Key"
+                                        >
+                                            {isCreatingBin ? 'A criar...' : 'Gerar ID'}
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">Cole um ID existente ou clique em "Gerar ID" para criar um novo.</p>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={handleSaveConfig}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full mb-2"
+                            >
+                                {cloudConfig ? 'Atualizar Configuração' : 'Ativar Sincronização'}
+                            </button>
+                            
+                            {cloudConfig && (
+                                <button 
+                                    onClick={onDisconnect}
+                                    className="border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full flex items-center justify-center gap-2"
+                                >
+                                    <IconX className="w-4 h-4" />
+                                    Desconectar / Resetar
+                                </button>
+                            )}
+
+                            <details className="mt-4 text-xs text-slate-500 cursor-pointer group">
+                                <summary className="flex items-center gap-1 font-medium hover:text-indigo-600 transition-colors">
+                                    <IconInfo className="w-3 h-3" />
+                                    Como fazer manualmente?
+                                </summary>
+                                <div className="mt-2 pl-2 border-l-2 border-slate-200 space-y-2 bg-slate-50 p-2 rounded-r-lg">
+                                    <p>1. Vá a <a href="https://jsonbin.io" target="_blank" className="text-indigo-600 underline">jsonbin.io</a> e faça login.</p>
+                                    <p>2. Clique em <strong>+ Create New</strong>.</p>
+                                    <p>3. <strong>IMPORTANTE:</strong> Escreva <code>{`{"dados": "inicio"}`}</code> no editor. O JSONBin proíbe Bins vazios.</p>
+                                    <p>4. Clique no ícone de disquete (Save). Copie o <strong>Bin ID</strong> do topo.</p>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </Card>
+
+                {/* 2. Magic Link */}
+                <Card className={`border-l-4 ${magicLink ? 'border-purple-500' : 'border-slate-200'}`}>
+                    <div className="flex items-start gap-4">
+                        <div className={`p-3 rounded-lg ${magicLink ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-400'}`}>
+                            <IconCopy className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-lg text-slate-800">2. Link de Acesso Universal</h3>
+                            <p className="text-slate-600 text-sm mt-1 mb-4">
+                                Este link contém as suas chaves. <strong>Guarde-o nos favoritos</strong>. 
+                                Sempre que abrir este link, os seus dados serão carregados automaticamente.
+                            </p>
+                            
+                            {magicLink ? (
+                                <>
+                                    <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-2 break-all text-xs font-mono text-slate-600">
+                                        {magicLink}
+                                    </div>
+                                    <p className="text-xs text-emerald-600 font-medium mb-4 flex items-center gap-1">
+                                        <IconCheck className="w-3 h-3" />
+                                        O link é permanente. Não muda ao editar dados.
+                                    </p>
+                                </>
+                            ) : (
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-4 text-xs font-mono text-slate-400 italic">
+                                    Preencha as chaves à esquerda para gerar o link...
+                                </div>
+                            )}
+
+                            <button 
+                                onClick={handleCopyLink}
+                                disabled={!magicLink}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${magicLink ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                            >
+                                <IconCopy className="w-4 h-4" />
+                                Copiar Link Mágico
+                            </button>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+        </div>
+    );
+};
+
 // --- Sub-View Components ---
 
 const DashboardView = ({ players, trainings, matches }: { players: Player[], trainings: TrainingSession[], matches: Match[] }) => {
@@ -1241,239 +1474,6 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
                         Nenhum jogo agendado.
                     </div>
                 )}
-            </div>
-        </div>
-    );
-};
-
-// --- Data Management View (RESTORED) ---
-const DataManagementView = ({ 
-    players, 
-    trainings, 
-    matches, 
-    onSetCloudConfig,
-    cloudConfig,
-    onDisconnect
-}: { 
-    players: Player[], 
-    trainings: TrainingSession[], 
-    matches: Match[],
-    onSetCloudConfig: (config: { apiKey: string, binId: string }) => void,
-    cloudConfig: { apiKey: string, binId: string } | null,
-    onDisconnect: () => void
-}) => {
-    const [jsonBinConfig, setJsonBinConfig] = useState({ 
-        apiKey: cloudConfig?.apiKey || '', 
-        binId: cloudConfig?.binId || '' 
-    });
-    
-    const [magicLink, setMagicLink] = useState('');
-    const [isCreatingBin, setIsCreatingBin] = useState(false);
-
-    useEffect(() => {
-        if (jsonBinConfig.apiKey && jsonBinConfig.binId) {
-            const baseUrl = window.location.origin + window.location.pathname;
-            const params = new URLSearchParams();
-            params.set('binId', jsonBinConfig.binId);
-            params.set('apiKey', jsonBinConfig.apiKey);
-            setMagicLink(`${baseUrl}?${params.toString()}`);
-        } else {
-            setMagicLink('');
-        }
-    }, [jsonBinConfig]);
-
-    useEffect(() => {
-        if (cloudConfig) {
-            setJsonBinConfig(cloudConfig);
-        }
-    }, [cloudConfig]);
-
-    const handleSaveConfig = () => {
-        if (!jsonBinConfig.apiKey || !jsonBinConfig.binId) {
-            alert("Preencha ambos os campos.");
-            return;
-        }
-        onSetCloudConfig(jsonBinConfig);
-    };
-
-    const handleAutoCreateBin = async () => {
-        if (!jsonBinConfig.apiKey) {
-            alert("Por favor, cole a sua X-Master-Key primeiro.");
-            return;
-        }
-        
-        setIsCreatingBin(true);
-        try {
-            const response = await fetch('https://api.jsonbin.io/v3/b', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Master-Key': jsonBinConfig.apiKey,
-                    'X-Bin-Name': 'RugbyManager_Data'
-                },
-                body: JSON.stringify({ 
-                    info: "Initial Rugby Manager Data",
-                    players: players, 
-                    created_at: new Date().toISOString()
-                })
-            });
-
-            const data = await response.json();
-            
-            if (response.ok && data.metadata && data.metadata.id) {
-                setJsonBinConfig(prev => ({ ...prev, binId: data.metadata.id }));
-                alert("Bin criado com sucesso! O ID foi preenchido automaticamente. Clique em 'Ativar Sincronização'.");
-            } else {
-                console.error("Erro ao criar bin:", data);
-                alert("Erro ao criar Bin. Verifique se a sua Key está correta.\nErro: " + (data.message || 'Desconhecido'));
-            }
-        } catch (error) {
-            console.error(error);
-            alert("Erro de conexão ao JSONBin.io");
-        }
-        setIsCreatingBin(false);
-    };
-
-    const handleCopyLink = () => {
-        if (!magicLink) return;
-        navigator.clipboard.writeText(magicLink);
-        alert("Link copiado! Guarde-o ou envie para os seus outros dispositivos.");
-    };
-
-    return (
-        <div className="space-y-8 pb-10">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-800">Sincronização Cloud</h2>
-                <p className="text-slate-500 mt-2">
-                    Ligue a sua conta gratuita JSONBin.io para ter os seus dados em qualquer lugar, automaticamente.
-                </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* 1. Setup */}
-                <Card className={`border-l-4 ${cloudConfig ? 'border-green-500' : 'border-slate-300'}`}>
-                     <div className="flex items-start gap-4">
-                        <div className={`p-3 rounded-lg ${cloudConfig ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-600'}`}>
-                            <IconCloud className="w-6 h-6" />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                                1. Configurar Cloud
-                                {cloudConfig && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">Ativo</span>}
-                            </h3>
-                            <p className="text-slate-600 text-sm mt-1 mb-4">
-                                Crie uma conta em <a href="https://jsonbin.io" target="_blank" className="text-blue-600 underline">jsonbin.io</a>, obtenha a sua API Key e cole-a aqui.
-                            </p>
-                            
-                            <div className="grid gap-4 mb-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">X-Master-Key (API Key)</label>
-                                    <input 
-                                        type="password" 
-                                        value={jsonBinConfig.apiKey}
-                                        onChange={e => setJsonBinConfig({...jsonBinConfig, apiKey: e.target.value})}
-                                        className="w-full px-3 py-2 border rounded-md text-sm"
-                                        placeholder="Ex: $2b$10$..."
-                                    />
-                                    <p className="text-[10px] text-slate-400 mt-1">Encontre em: Profile Avatar &gt; API Keys &gt; Create New</p>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Bin ID</label>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="text" 
-                                            value={jsonBinConfig.binId}
-                                            onChange={e => setJsonBinConfig({...jsonBinConfig, binId: e.target.value})}
-                                            className="w-full px-3 py-2 border rounded-md text-sm"
-                                            placeholder="Ex: 67ab..."
-                                        />
-                                        <button 
-                                            onClick={handleAutoCreateBin}
-                                            disabled={isCreatingBin || !jsonBinConfig.apiKey}
-                                            className="shrink-0 px-3 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
-                                            title="Cria um Bin vazio automaticamente usando a sua Key"
-                                        >
-                                            {isCreatingBin ? 'A criar...' : 'Gerar ID'}
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] text-slate-400 mt-1">Cole um ID existente ou clique em "Gerar ID" para criar um novo.</p>
-                                </div>
-                            </div>
-
-                            <button 
-                                onClick={handleSaveConfig}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full mb-2"
-                            >
-                                {cloudConfig ? 'Atualizar Configuração' : 'Ativar Sincronização'}
-                            </button>
-                            
-                            {cloudConfig && (
-                                <button 
-                                    onClick={onDisconnect}
-                                    className="border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full flex items-center justify-center gap-2"
-                                >
-                                    <IconX className="w-4 h-4" />
-                                    Desconectar / Resetar
-                                </button>
-                            )}
-
-                            <details className="mt-4 text-xs text-slate-500 cursor-pointer group">
-                                <summary className="flex items-center gap-1 font-medium hover:text-indigo-600 transition-colors">
-                                    <IconInfo className="w-3 h-3" />
-                                    Como fazer manualmente?
-                                </summary>
-                                <div className="mt-2 pl-2 border-l-2 border-slate-200 space-y-2 bg-slate-50 p-2 rounded-r-lg">
-                                    <p>1. Vá a <a href="https://jsonbin.io" target="_blank" className="text-indigo-600 underline">jsonbin.io</a> e faça login.</p>
-                                    <p>2. Clique em <strong>+ Create New</strong>.</p>
-                                    <p>3. <strong>IMPORTANTE:</strong> Escreva <code>{`{"dados": "inicio"}`}</code> no editor. O JSONBin proíbe Bins vazios.</p>
-                                    <p>4. Clique no ícone de disquete (Save). Copie o <strong>Bin ID</strong> do topo.</p>
-                                </div>
-                            </details>
-                        </div>
-                    </div>
-                </Card>
-
-                {/* 2. Magic Link */}
-                <Card className={`border-l-4 ${magicLink ? 'border-purple-500' : 'border-slate-200'}`}>
-                    <div className="flex items-start gap-4">
-                        <div className={`p-3 rounded-lg ${magicLink ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-400'}`}>
-                            <IconCopy className="w-6 h-6" />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-lg text-slate-800">2. Link de Acesso Universal</h3>
-                            <p className="text-slate-600 text-sm mt-1 mb-4">
-                                Este link contém as suas chaves. <strong>Guarde-o nos favoritos</strong>. 
-                                Sempre que abrir este link, os seus dados serão carregados automaticamente.
-                            </p>
-                            
-                            {magicLink ? (
-                                <>
-                                    <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-2 break-all text-xs font-mono text-slate-600">
-                                        {magicLink}
-                                    </div>
-                                    <p className="text-xs text-emerald-600 font-medium mb-4 flex items-center gap-1">
-                                        <IconCheck className="w-3 h-3" />
-                                        O link é permanente. Não muda ao editar dados.
-                                    </p>
-                                </>
-                            ) : (
-                                <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-4 text-xs font-mono text-slate-400 italic">
-                                    Preencha as chaves à esquerda para gerar o link...
-                                </div>
-                            )}
-
-                            <button 
-                                onClick={handleCopyLink}
-                                disabled={!magicLink}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${magicLink ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
-                            >
-                                <IconCopy className="w-4 h-4" />
-                                Copiar Link Mágico
-                            </button>
-                        </div>
-                    </div>
-                </Card>
             </div>
         </div>
     );

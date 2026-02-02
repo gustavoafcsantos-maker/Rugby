@@ -582,6 +582,670 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     );
 };
 
+// --- Sub-View Components ---
+
+const DashboardView = ({ players, trainings, matches }: { players: Player[], trainings: TrainingSession[], matches: Match[] }) => {
+    const totalPlayers = players.length;
+    const availablePlayers = players.filter(p => p.status === PlayerStatus.AVAILABLE).length;
+    const injuredPlayers = players.filter(p => p.status === PlayerStatus.INJURED).length;
+    const nextMatch = matches.length > 0 
+      ? matches.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0] 
+      : null;
+
+    const attendanceData = trainings.slice(0, 5).reverse().map(t => ({
+      name: new Date(t.date).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }),
+      jogadores: Object.values(t.attendance).filter(status => status === AttendanceStatus.PRESENT).length
+    }));
+
+    const statusData = [
+      { name: 'Disponíveis', value: availablePlayers, color: '#22c55e' },
+      { name: 'Lesionados', value: injuredPlayers, color: '#ef4444' },
+      { name: 'Outros', value: totalPlayers - availablePlayers - injuredPlayers, color: '#94a3b8' },
+    ];
+
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <h2 className="text-2xl font-bold text-slate-800">Painel de Controlo</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="border-l-4 border-blue-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Plantel Total</p>
+                <p className="text-3xl font-bold text-slate-800">{totalPlayers}</p>
+              </div>
+              <div className="bg-blue-100 p-3 rounded-full text-blue-600">
+                <IconUsers className="w-6 h-6" />
+              </div>
+            </div>
+          </Card>
+          <Card className="border-l-4 border-green-500">
+             <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Disponíveis</p>
+                <p className="text-3xl font-bold text-slate-800">{availablePlayers}</p>
+              </div>
+              <div className="bg-green-100 p-3 rounded-full text-green-600">
+                <IconCheck className="w-6 h-6" />
+              </div>
+            </div>
+          </Card>
+          <Card className="border-l-4 border-amber-500">
+             <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Próximo Jogo</p>
+                <p className="text-lg font-bold text-slate-800 truncate">{nextMatch?.opponent || 'Nenhum'}</p>
+                <p className="text-xs text-slate-400">
+                  {nextMatch ? new Date(nextMatch.date).toLocaleDateString('pt-PT') : '-'}
+                </p>
+              </div>
+              <div className="bg-amber-100 p-3 rounded-full text-amber-600">
+                <IconTrophy className="w-6 h-6" />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <h3 className="text-lg font-semibold mb-4 text-slate-700">Presenças Recentes</h3>
+            {trainings.length > 0 ? (
+                <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={attendanceData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
+                    <Tooltip 
+                        cursor={{fill: '#f1f5f9'}}
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Bar dataKey="jogadores" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+                    </BarChart>
+                </ResponsiveContainer>
+                </div>
+            ) : (
+                <div className="h-64 flex items-center justify-center text-slate-400">
+                    <p>Sem dados de treino.</p>
+                </div>
+            )}
+          </Card>
+
+          <Card>
+             <h3 className="text-lg font-semibold mb-4 text-slate-700">Status do Plantel</h3>
+             {totalPlayers > 0 ? (
+                 <div className="h-64 flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                        data={statusData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                        >
+                        {statusData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                        </Pie>
+                        <Tooltip />
+                    </PieChart>
+                    </ResponsiveContainer>
+                </div>
+             ) : (
+                 <div className="h-64 flex items-center justify-center text-slate-400">
+                     <p>Sem jogadores.</p>
+                 </div>
+             )}
+          </Card>
+        </div>
+      </div>
+    );
+};
+
+const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, updatePlayer }: { players: Player[], trainings: TrainingSession[], matches: Match[], addPlayer: (p: Player) => void, removePlayer: (id: string) => void, updatePlayer: (p: Player) => void }) => {
+    const [isAdding, setIsAdding] = useState(false);
+    const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+    const [newPlayerName, setNewPlayerName] = useState('');
+    const [newPlayerPos, setNewPlayerPos] = useState<Position>(Position.WING);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleAdd = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newPlayerName) return;
+      addPlayer({
+        id: Date.now().toString(),
+        name: newPlayerName,
+        position: newPlayerPos,
+        status: PlayerStatus.AVAILABLE,
+        caps: 0
+      });
+      setNewPlayerName('');
+      setIsAdding(false);
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = new Uint8Array(event.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+                processData(rows);
+            } catch (error) {
+                console.error("Erro ao processar ficheiro:", error);
+                alert("Erro ao ler o ficheiro. Certifique-se que não está corrompido.");
+            } finally {
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    const processData = (rows: any[][]) => {
+        if (!rows || rows.length < 3) {
+            alert("O ficheiro parece não ter linhas suficientes (cabeçalho esperado na linha 3).");
+            return;
+        }
+
+        const HEADER_ROW_INDEX = 2;
+        const DATA_START_INDEX = 3; 
+
+        const headerRow = rows[HEADER_ROW_INDEX];
+        if (!headerRow) {
+             alert("Linha de cabeçalho (linha 3) não encontrada.");
+             return;
+        }
+
+        const headers: string[] = [];
+        for (let i = 0; i < headerRow.length; i++) {
+            const val = headerRow[i];
+            headers.push(val ? String(val).toLowerCase().trim() : '');
+        }
+        
+        const nameIdx = 2;
+        
+        const findCol = (terms: string[]) => {
+            let idx = headers.findIndex(h => terms.some(t => h.includes(t)) && h.includes('2025'));
+            if (idx !== -1) return idx;
+            idx = headers.findIndex(h => terms.some(t => h.includes(t)) && !h.includes('2024'));
+            return idx;
+        };
+
+        const birthDateIdx = findCol(['nascimento', 'data', 'birth']);
+        const heightIdx = findCol(['altura', 'height']);
+        const weightIdx = findCol(['peso', 'weight']);
+        const posIdx = findCol(['posi', 'role']);
+        const capsIdx = findCol(['caps', 'internacional']);
+
+        let addedCount = 0;
+        
+        for (let i = DATA_START_INDEX; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row) continue;
+            
+            const name = String(row[nameIdx] || '').trim();
+            if (!name) continue;
+
+            let birthDate = undefined;
+            if (birthDateIdx !== -1) {
+                const rawDate = row[birthDateIdx];
+                if (typeof rawDate === 'string') {
+                    if (rawDate.includes('/')) {
+                        const parts = rawDate.trim().split('/');
+                        if (parts.length === 3) birthDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                    } else if (rawDate.includes('-')) {
+                        birthDate = rawDate;
+                    }
+                }
+            }
+
+            let finalHeight = undefined;
+            if (heightIdx !== -1) {
+                const rawHeight = row[heightIdx];
+                if (rawHeight) {
+                    const h = parseFloat(String(rawHeight).replace(',', '.'));
+                    if (!isNaN(h)) finalHeight = h < 3 ? h * 100 : h; 
+                }
+            }
+
+            let finalWeight = undefined;
+            if (weightIdx !== -1) {
+                const rawWeight = row[weightIdx];
+                if (rawWeight) {
+                    const w = parseFloat(String(rawWeight).replace(',', '.'));
+                    if (!isNaN(w)) finalWeight = w;
+                }
+            }
+
+            let position = Position.WING; 
+            const posRaw = posIdx !== -1 ? (String(row[posIdx] || '')).toUpperCase() : '';
+            
+            if (posRaw) {
+                 if (posRaw.includes('PIL') || posRaw.includes('PROP')) position = Position.PROP;
+                 else if (posRaw.includes('TAL') || posRaw.includes('HOOK')) position = Position.HOOKER;
+                 else if (posRaw.includes('2') || posRaw.includes('LOCK')) position = Position.LOCK;
+                 else if (posRaw.includes('ASA') || posRaw.includes('FLANK')) position = Position.FLANKER;
+                 else if (posRaw.includes('8') || posRaw.includes('NO8')) position = Position.NO8;
+                 else if (posRaw.includes('MEDIO') || posRaw.includes('SCRUM') || posRaw.includes('ABERTURA')) {
+                     position = posRaw.includes('ABERTURA') || posRaw.includes('FLY') ? Position.FLY_HALF : Position.SCRUM_HALF;
+                 }
+                 else if (posRaw.includes('CENTRO') || posRaw.includes('CENTER')) position = Position.CENTRE;
+                 else if (posRaw.includes('PONTA') || posRaw.includes('WING')) position = Position.WING;
+                 else if (posRaw.includes('ARREIO') || posRaw.includes('FULL')) position = Position.FULLBACK;
+            } else {
+                 const w = finalWeight || 75;
+                 const h = finalHeight || 175;
+                 if (w > 100) position = Position.PROP;
+                 else if (h > 185) position = Position.LOCK;
+                 else if (w > 85) position = Position.FLANKER;
+                 else position = Position.WING;
+            }
+
+            const caps = capsIdx !== -1 ? (parseInt(String(row[capsIdx] || '0')) || 0) : 0;
+
+            addPlayer({
+                id: `import-${Date.now()}-${i}`,
+                name: name,
+                position: position,
+                status: PlayerStatus.AVAILABLE,
+                caps: caps,
+                birthDate: birthDate,
+                height: finalHeight ? Math.round(finalHeight) : undefined,
+                weight: finalWeight || undefined
+            });
+            addedCount++;
+        }
+
+        if (addedCount > 0) {
+            alert(`${addedCount} jogadores importados com sucesso!`);
+        } else {
+            alert("Nenhum jogador encontrado. Verifique se o ficheiro tem dados nas linhas seguintes ao cabeçalho.");
+        }
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <h2 className="text-2xl font-bold text-slate-800">Plantel ({players.length})</h2>
+          <div className="flex gap-2">
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                accept=".csv, .xlsx, .xls" 
+                className="hidden" 
+            />
+            <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg transition-colors shadow-sm"
+                title="Suporta Excel (.xlsx, .xls) e CSV"
+            >
+                <IconUpload className="w-4 h-4" />
+                <span>Importar Excel/CSV</span>
+            </button>
+            <button 
+                onClick={() => setIsAdding(true)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
+            >
+                <IconUserPlus className="w-4 h-4" />
+                <span>Adicionar Jogador</span>
+            </button>
+          </div>
+        </div>
+
+        {editingPlayer && (
+          <PlayerDetailsModal 
+            player={editingPlayer} 
+            trainings={trainings}
+            matches={matches}
+            onClose={() => setEditingPlayer(null)} 
+            onSave={(updated) => { updatePlayer(updated); setEditingPlayer(null); }} 
+          />
+        )}
+
+        {isAdding && (
+          <Card className="bg-blue-50 border-blue-100 animate-in fade-in slide-in-from-top-4">
+            <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-4 items-end">
+              <div className="flex-1 w-full">
+                <label className="block text-sm font-medium text-blue-900 mb-1">Nome</label>
+                <input 
+                  type="text" 
+                  value={newPlayerName}
+                  onChange={(e) => setNewPlayerName(e.target.value)}
+                  className="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: João Silva"
+                />
+              </div>
+              <div className="w-full md:w-64">
+                <label className="block text-sm font-medium text-blue-900 mb-1">Posição</label>
+                <select 
+                  value={newPlayerPos}
+                  onChange={(e) => setNewPlayerPos(e.target.value as Position)}
+                  className="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {(Object.values(Position) as string[]).map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                 <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-blue-600 hover:bg-blue-100 rounded-md">Cancelar</button>
+                 <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Guardar</button>
+              </div>
+            </form>
+          </Card>
+        )}
+
+        {players.length > 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <table className="w-full text-left">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th className="px-6 py-4 font-semibold text-slate-600">Nome</th>
+                    <th className="px-6 py-4 font-semibold text-slate-600">Posição</th>
+                    <th className="px-6 py-4 font-semibold text-slate-600">Caps</th>
+                    <th className="px-6 py-4 font-semibold text-slate-600">Status</th>
+                    <th className="px-6 py-4 font-semibold text-slate-600 text-right">Ações</th>
+                </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                {players.map(player => (
+                    <tr key={player.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-800">{player.name}</td>
+                    <td className="px-6 py-4 text-slate-600">{player.position}</td>
+                    <td className="px-6 py-4 text-slate-600">{player.caps}</td>
+                    <td className="px-6 py-4">
+                        <StatusBadge status={player.status} />
+                    </td>
+                    <td className="px-6 py-4 text-right flex justify-end gap-2">
+                        <button 
+                        onClick={() => setEditingPlayer(player)}
+                        className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                        title="Editar Ficha de Jogador"
+                        >
+                        <IconEdit className="w-4 h-4" />
+                        </button>
+                        <button 
+                        onClick={() => removePlayer(player.id)}
+                        className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                        title="Remover Jogador"
+                        >
+                        <IconTrash className="w-4 h-4" />
+                        </button>
+                    </td>
+                    </tr>
+                ))}
+                </tbody>
+            </table>
+            </div>
+        ) : (
+            <div className="text-center py-20 bg-white border border-dashed border-slate-300 rounded-xl">
+                <IconUsers className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-700">Sem jogadores</h3>
+                <p className="text-slate-500 mb-6">Adicione manualmente ou importe um CSV/Excel.</p>
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-blue-600 font-medium hover:underline"
+                >
+                    Importar do Excel (CSV)
+                </button>
+            </div>
+        )}
+      </div>
+    );
+};
+
+const TrainingView = ({ trainings, players, addTraining, updateTraining }: { trainings: TrainingSession[], players: Player[], addTraining: (t: TrainingSession) => void, updateTraining: (t: TrainingSession) => void }) => {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newDate, setNewDate] = useState('');
+  const [newFocus, setNewFocus] = useState('');
+  const [loadingPlan, setLoadingPlan] = useState(false);
+  const [selectedTraining, setSelectedTraining] = useState<TrainingSession | null>(null);
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDate || !newFocus) return;
+
+    const attendance: Record<string, AttendanceStatus> = {};
+    players.forEach(p => attendance[p.id] = AttendanceStatus.PRESENT);
+
+    const newTraining: TrainingSession = {
+      id: Date.now().toString(),
+      date: newDate,
+      focus: newFocus,
+      attendance: attendance
+    };
+
+    addTraining(newTraining);
+    setIsAdding(false);
+    setNewDate('');
+    setNewFocus('');
+  };
+
+  const handleGeneratePlan = async (training: TrainingSession) => {
+    setLoadingPlan(true);
+    const plan = await generateTrainingPlan(
+      Object.values(training.attendance).filter(s => s === AttendanceStatus.PRESENT).length,
+      training.focus,
+      players.map(p => p.position)
+    );
+    alert(plan); 
+    setLoadingPlan(false);
+  };
+  
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-slate-800">Treinos</h2>
+        <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          <IconPlus className="w-4 h-4" /> Novo Treino
+        </button>
+      </div>
+
+      {isAdding && (
+         <Card className="bg-blue-50 border-blue-100 animate-in fade-in">
+           <form onSubmit={handleAdd} className="flex gap-4 items-end">
+             <div className="flex-1">
+               <label className="block text-sm font-medium text-blue-900 mb-1">Data</label>
+               <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="w-full px-3 py-2 rounded-md border border-blue-200" required />
+             </div>
+             <div className="flex-[2]">
+               <label className="block text-sm font-medium text-blue-900 mb-1">Foco do Treino</label>
+               <input type="text" value={newFocus} onChange={e => setNewFocus(e.target.value)} className="w-full px-3 py-2 rounded-md border border-blue-200" placeholder="Ex: Defesa em linha" required />
+             </div>
+             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Guardar</button>
+             <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-blue-600 hover:bg-blue-100 rounded-md">Cancelar</button>
+           </form>
+         </Card>
+      )}
+
+      {selectedTraining && (
+          <TrainingDetailsModal 
+            training={selectedTraining}
+            players={players}
+            onClose={() => setSelectedTraining(null)}
+            onSave={(updated) => {
+                updateTraining(updated);
+                setSelectedTraining(null);
+            }}
+          />
+      )}
+
+      <div className="grid gap-4">
+        {trainings.slice().reverse().map(t => (
+          <Card key={t.id} className="hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group" onClick={() => setSelectedTraining(t)}>
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-lg text-slate-800 group-hover:text-blue-600 transition-colors">{new Date(t.date).toLocaleDateString('pt-PT')}</h3>
+                <p className="text-slate-600">{t.focus}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleGeneratePlan(t); }}
+                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium px-3 py-1 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors z-10"
+                >
+                  {loadingPlan ? 'A gerar...' : 'Gerar Plano AI'}
+                </button>
+                <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-600">
+                    {Object.values(t.attendance).filter(s => s === AttendanceStatus.PRESENT).length}
+                    </div>
+                    <div className="text-xs text-slate-400">Presentes</div>
+                </div>
+                <IconChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500" />
+              </div>
+            </div>
+          </Card>
+        ))}
+        {trainings.length === 0 && (
+            <div className="text-center py-10 text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
+                <IconCalendar className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                Nenhum treino registado.
+            </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Match[], players: Player[], addMatch: (m: Match) => void, updateMatch: (m: Match) => void }) => {
+    const [isAdding, setIsAdding] = useState(false);
+    const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+    const [newMatchData, setNewMatchData] = useState({ opponent: '', date: '', location: 'Home' as 'Home' | 'Away' });
+
+    const handleAdd = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newMatchData.opponent || !newMatchData.date) return;
+        
+        const newMatch: Match = {
+            id: Date.now().toString(),
+            opponent: newMatchData.opponent,
+            date: newMatchData.date,
+            location: newMatchData.location,
+            playerStatus: {}, 
+            startingXV: Array(15).fill(''),
+            subs: [],
+            playingTime: {}
+        };
+        addMatch(newMatch);
+        setIsAdding(false);
+        setNewMatchData({ opponent: '', date: '', location: 'Home' });
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-slate-800">Gestão de Jogos</h2>
+                <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    <IconPlus className="w-4 h-4" /> Novo Jogo
+                </button>
+            </div>
+
+            {isAdding && (
+                 <Card className="bg-blue-50 border-blue-100 animate-in fade-in">
+                   <form onSubmit={handleAdd} className="flex gap-4 items-end">
+                     <div className="flex-[2]">
+                       <label className="block text-sm font-medium text-blue-900 mb-1">Adversário</label>
+                       <input 
+                            type="text" 
+                            value={newMatchData.opponent} 
+                            onChange={e => setNewMatchData({...newMatchData, opponent: e.target.value})} 
+                            className="w-full px-3 py-2 rounded-md border border-blue-200" 
+                            placeholder="Ex: CDUL" 
+                            required 
+                        />
+                     </div>
+                     <div className="flex-1">
+                       <label className="block text-sm font-medium text-blue-900 mb-1">Data</label>
+                       <input 
+                            type="date" 
+                            value={newMatchData.date} 
+                            onChange={e => setNewMatchData({...newMatchData, date: e.target.value})} 
+                            className="w-full px-3 py-2 rounded-md border border-blue-200" 
+                            required 
+                        />
+                     </div>
+                     <div className="flex-1">
+                        <label className="block text-sm font-medium text-blue-900 mb-1">Local</label>
+                        <select 
+                            value={newMatchData.location}
+                            onChange={e => setNewMatchData({...newMatchData, location: e.target.value as 'Home'|'Away'})}
+                            className="w-full px-3 py-2 rounded-md border border-blue-200"
+                        >
+                            <option value="Home">Casa</option>
+                            <option value="Away">Fora</option>
+                        </select>
+                     </div>
+                     <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Guardar</button>
+                     <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-blue-600 hover:bg-blue-100 rounded-md">Cancelar</button>
+                   </form>
+                 </Card>
+            )}
+
+            {selectedMatch && (
+                <MatchDetailsModal 
+                    match={selectedMatch}
+                    players={players}
+                    onClose={() => setSelectedMatch(null)}
+                    onSave={(updated) => { updateMatch(updated); setSelectedMatch(null); }}
+                />
+            )}
+
+            <div className="grid gap-4">
+                {matches.slice().sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(m => (
+                    <Card key={m.id} className="hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group" onClick={() => setSelectedMatch(m)}>
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <div className={`p-3 rounded-full ${m.location === 'Home' ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>
+                                    <IconTrophy className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg text-slate-800 group-hover:text-blue-600 transition-colors">{m.opponent}</h3>
+                                    <p className="text-slate-600 text-sm flex items-center gap-2">
+                                        {new Date(m.date).toLocaleDateString('pt-PT')}
+                                        <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                                        {m.location === 'Home' ? 'Em Casa' : 'Fora'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-6">
+                                <div className="text-right">
+                                    <p className="text-2xl font-bold text-slate-700">
+                                        {Object.values(m.playerStatus).filter(s => s === MatchSelectionStatus.SELECTED).length}
+                                    </p>
+                                    <p className="text-xs text-slate-400">Convocados</p>
+                                </div>
+                                <div className="h-8 w-[1px] bg-slate-200"></div>
+                                <div className="text-right">
+                                     <p className="text-2xl font-bold text-slate-700">
+                                        {(m.startingXV || []).filter(Boolean).length}
+                                    </p>
+                                    <p className="text-xs text-slate-400">XV Inicial</p>
+                                </div>
+                                <IconChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 ml-4" />
+                            </div>
+                        </div>
+                    </Card>
+                ))}
+                {matches.length === 0 && (
+                     <div className="text-center py-10 text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
+                        <IconTrophy className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                        Nenhum jogo agendado.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // --- Data Management View (RESTORED) ---
 const DataManagementView = ({ 
     players, 
@@ -815,694 +1479,6 @@ const DataManagementView = ({
     );
 };
 
-// --- Sub-View Components ---
-
-const DashboardView = ({ players, trainings, matches }: { players: Player[], trainings: TrainingSession[], matches: Match[] }) => {
-    const totalPlayers = players.length;
-    const availablePlayers = players.filter(p => p.status === PlayerStatus.AVAILABLE).length;
-    const injuredPlayers = players.filter(p => p.status === PlayerStatus.INJURED).length;
-    const nextMatch = matches.length > 0 
-      ? matches.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0] 
-      : null;
-
-    const attendanceData = trainings.slice(0, 5).reverse().map(t => ({
-      name: new Date(t.date).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }),
-      jogadores: Object.values(t.attendance).filter(status => status === AttendanceStatus.PRESENT).length
-    }));
-
-    const statusData = [
-      { name: 'Disponíveis', value: availablePlayers, color: '#22c55e' },
-      { name: 'Lesionados', value: injuredPlayers, color: '#ef4444' },
-      { name: 'Outros', value: totalPlayers - availablePlayers - injuredPlayers, color: '#94a3b8' },
-    ];
-
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <h2 className="text-2xl font-bold text-slate-800">Painel de Controlo</h2>
-        
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 font-medium">Plantel Total</p>
-                <p className="text-3xl font-bold text-slate-800">{totalPlayers}</p>
-              </div>
-              <div className="bg-blue-100 p-3 rounded-full text-blue-600">
-                <IconUsers className="w-6 h-6" />
-              </div>
-            </div>
-          </Card>
-          <Card className="border-l-4 border-green-500">
-             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 font-medium">Disponíveis</p>
-                <p className="text-3xl font-bold text-slate-800">{availablePlayers}</p>
-              </div>
-              <div className="bg-green-100 p-3 rounded-full text-green-600">
-                <IconCheck className="w-6 h-6" />
-              </div>
-            </div>
-          </Card>
-          <Card className="border-l-4 border-amber-500">
-             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 font-medium">Próximo Jogo</p>
-                <p className="text-lg font-bold text-slate-800 truncate">{nextMatch?.opponent || 'Nenhum'}</p>
-                <p className="text-xs text-slate-400">
-                  {nextMatch ? new Date(nextMatch.date).toLocaleDateString('pt-PT') : '-'}
-                </p>
-              </div>
-              <div className="bg-amber-100 p-3 rounded-full text-amber-600">
-                <IconTrophy className="w-6 h-6" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <h3 className="text-lg font-semibold mb-4 text-slate-700">Presenças Recentes</h3>
-            {trainings.length > 0 ? (
-                <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={attendanceData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                    <Tooltip 
-                        cursor={{fill: '#f1f5f9'}}
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    />
-                    <Bar dataKey="jogadores" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
-                    </BarChart>
-                </ResponsiveContainer>
-                </div>
-            ) : (
-                <div className="h-64 flex items-center justify-center text-slate-400">
-                    <p>Sem dados de treino.</p>
-                </div>
-            )}
-          </Card>
-
-          <Card>
-             <h3 className="text-lg font-semibold mb-4 text-slate-700">Status do Plantel</h3>
-             {totalPlayers > 0 ? (
-                 <div className="h-64 flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <Pie
-                        data={statusData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                        >
-                        {statusData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                        </Pie>
-                        <Tooltip />
-                    </PieChart>
-                    </ResponsiveContainer>
-                </div>
-             ) : (
-                 <div className="h-64 flex items-center justify-center text-slate-400">
-                     <p>Sem jogadores.</p>
-                 </div>
-             )}
-          </Card>
-        </div>
-      </div>
-    );
-};
-
-const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, updatePlayer }: { players: Player[], trainings: TrainingSession[], matches: Match[], addPlayer: (p: Player) => void, removePlayer: (id: string) => void, updatePlayer: (p: Player) => void }) => {
-    const [isAdding, setIsAdding] = useState(false);
-    const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
-    const [newPlayerName, setNewPlayerName] = useState('');
-    const [newPlayerPos, setNewPlayerPos] = useState<Position>(Position.WING);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleAdd = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!newPlayerName) return;
-      addPlayer({
-        id: Date.now().toString(),
-        name: newPlayerName,
-        position: newPlayerPos,
-        status: PlayerStatus.AVAILABLE,
-        caps: 0
-      });
-      setNewPlayerName('');
-      setIsAdding(false);
-    };
-
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const data = new Uint8Array(event.target?.result as ArrayBuffer);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
-                // Obter dados como array de arrays para facilitar processamento
-                const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
-                processData(rows);
-            } catch (error) {
-                console.error("Erro ao processar ficheiro:", error);
-                alert("Erro ao ler o ficheiro. Certifique-se que não está corrompido.");
-            } finally {
-                // Limpar o input para permitir carregar o mesmo ficheiro novamente se necessário
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    };
-
-    const processData = (rows: any[][]) => {
-        if (!rows || rows.length < 3) {
-            alert("O ficheiro parece não ter linhas suficientes (cabeçalho esperado na linha 3).");
-            return;
-        }
-
-        // Especificação do utilizador: Cabeçalho na linha 3 (index 2)
-        const HEADER_ROW_INDEX = 2;
-        // Dados começam na linha 4 (index 3)
-        const DATA_START_INDEX = 3; 
-
-        // Safe header processing
-        const headerRow = rows[HEADER_ROW_INDEX];
-        if (!headerRow) {
-             alert("Linha de cabeçalho (linha 3) não encontrada.");
-             return;
-        }
-
-        const headers: string[] = [];
-        // Use loop to handle sparse arrays correctly
-        for (let i = 0; i < headerRow.length; i++) {
-            const val = headerRow[i];
-            headers.push(val ? String(val).toLowerCase().trim() : '');
-        }
-        
-        // Colunas essenciais
-        // Especificação do utilizador: Nome na coluna 3 (index 2 - considerando A=0, B=1, C=2)
-        const nameIdx = 2;
-        
-        // Helper para encontrar colunas ignorando 2024 e preferindo 2025
-        const findCol = (terms: string[]) => {
-            // 1. Tentar encontrar com termo E "2025"
-            let idx = headers.findIndex(h => terms.some(t => h.includes(t)) && h.includes('2025'));
-            if (idx !== -1) return idx;
-            
-            // 2. Tentar encontrar com termo MAS SEM "2024"
-            idx = headers.findIndex(h => terms.some(t => h.includes(t)) && !h.includes('2024'));
-            return idx;
-        };
-
-        // Mapeamento opcional
-        const birthDateIdx = findCol(['nascimento', 'data', 'birth']);
-        const heightIdx = findCol(['altura', 'height']);
-        const weightIdx = findCol(['peso', 'weight']);
-        const posIdx = findCol(['posi', 'role']);
-        const capsIdx = findCol(['caps', 'internacional']);
-
-        let addedCount = 0;
-        
-        // Loop a começar na linha especificada
-        for (let i = DATA_START_INDEX; i < rows.length; i++) {
-            const row = rows[i];
-            if (!row) continue;
-            
-            // Validar se existe nome na coluna especificada (coluna 3 -> index 2)
-            const name = String(row[nameIdx] || '').trim();
-            if (!name) continue;
-
-            // Date Parsing
-            let birthDate = undefined;
-            if (birthDateIdx !== -1) {
-                const rawDate = row[birthDateIdx];
-                // SheetJS por vezes retorna números para datas (Excel serial date)
-                if (typeof rawDate === 'string') {
-                    // Tentar formatos comuns DD/MM/YYYY ou YYYY-MM-DD
-                    if (rawDate.includes('/')) {
-                        const parts = rawDate.trim().split('/');
-                        if (parts.length === 3) birthDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-                    } else if (rawDate.includes('-')) {
-                        birthDate = rawDate;
-                    }
-                }
-            }
-
-            // Stats Parsing
-            let finalHeight = undefined;
-            if (heightIdx !== -1) {
-                const rawHeight = row[heightIdx];
-                if (rawHeight) {
-                    const h = parseFloat(String(rawHeight).replace(',', '.'));
-                    if (!isNaN(h)) finalHeight = h < 3 ? h * 100 : h; // Converter metros para cm
-                }
-            }
-
-            let finalWeight = undefined;
-            if (weightIdx !== -1) {
-                const rawWeight = row[weightIdx];
-                if (rawWeight) {
-                    const w = parseFloat(String(rawWeight).replace(',', '.'));
-                    if (!isNaN(w)) finalWeight = w;
-                }
-            }
-
-            // Position Inference
-            let position = Position.WING; 
-            const posRaw = posIdx !== -1 ? (String(row[posIdx] || '')).toUpperCase() : '';
-            
-            if (posRaw) {
-                 if (posRaw.includes('PIL') || posRaw.includes('PROP')) position = Position.PROP;
-                 else if (posRaw.includes('TAL') || posRaw.includes('HOOK')) position = Position.HOOKER;
-                 else if (posRaw.includes('2') || posRaw.includes('LOCK')) position = Position.LOCK;
-                 else if (posRaw.includes('ASA') || posRaw.includes('FLANK')) position = Position.FLANKER;
-                 else if (posRaw.includes('8') || posRaw.includes('NO8')) position = Position.NO8;
-                 else if (posRaw.includes('MEDIO') || posRaw.includes('SCRUM') || posRaw.includes('ABERTURA')) {
-                     position = posRaw.includes('ABERTURA') || posRaw.includes('FLY') ? Position.FLY_HALF : Position.SCRUM_HALF;
-                 }
-                 else if (posRaw.includes('CENTRO') || posRaw.includes('CENTER')) position = Position.CENTRE;
-                 else if (posRaw.includes('PONTA') || posRaw.includes('WING')) position = Position.WING;
-                 else if (posRaw.includes('ARREIO') || posRaw.includes('FULL')) position = Position.FULLBACK;
-            } else {
-                 // Heurística básica se não houver posição
-                 const w = finalWeight || 75;
-                 const h = finalHeight || 175;
-                 if (w > 100) position = Position.PROP;
-                 else if (h > 185) position = Position.LOCK;
-                 else if (w > 85) position = Position.FLANKER;
-                 else position = Position.WING;
-            }
-
-            const caps = capsIdx !== -1 ? (parseInt(String(row[capsIdx] || '0')) || 0) : 0;
-
-            addPlayer({
-                id: `import-${Date.now()}-${i}`,
-                name: name,
-                position: position,
-                status: PlayerStatus.AVAILABLE,
-                caps: caps,
-                birthDate: birthDate,
-                height: finalHeight ? Math.round(finalHeight) : undefined,
-                weight: finalWeight || undefined
-            });
-            addedCount++;
-        }
-
-        if (addedCount > 0) {
-            alert(`${addedCount} jogadores importados com sucesso!`);
-        } else {
-            alert("Nenhum jogador encontrado. Verifique se o ficheiro tem dados nas linhas seguintes ao cabeçalho.");
-        }
-    };
-
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <h2 className="text-2xl font-bold text-slate-800">Plantel ({players.length})</h2>
-          <div className="flex gap-2">
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileUpload} 
-                accept=".csv, .xlsx, .xls" 
-                className="hidden" 
-            />
-            <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg transition-colors shadow-sm"
-                title="Suporta Excel (.xlsx, .xls) e CSV"
-            >
-                <IconUpload className="w-4 h-4" />
-                <span>Importar Excel/CSV</span>
-            </button>
-            <button 
-                onClick={() => setIsAdding(true)}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
-            >
-                <IconUserPlus className="w-4 h-4" />
-                <span>Adicionar Jogador</span>
-            </button>
-          </div>
-        </div>
-
-        {editingPlayer && (
-          <PlayerDetailsModal 
-            player={editingPlayer} 
-            trainings={trainings}
-            matches={matches}
-            onClose={() => setEditingPlayer(null)} 
-            onSave={(updated) => { updatePlayer(updated); setEditingPlayer(null); }} 
-          />
-        )}
-
-        {isAdding && (
-          <Card className="bg-blue-50 border-blue-100 animate-in fade-in slide-in-from-top-4">
-            <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-4 items-end">
-              <div className="flex-1 w-full">
-                <label className="block text-sm font-medium text-blue-900 mb-1">Nome</label>
-                <input 
-                  type="text" 
-                  value={newPlayerName}
-                  onChange={(e) => setNewPlayerName(e.target.value)}
-                  className="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ex: João Silva"
-                />
-              </div>
-              <div className="w-full md:w-64">
-                <label className="block text-sm font-medium text-blue-900 mb-1">Posição</label>
-                <select 
-                  value={newPlayerPos}
-                  onChange={(e) => setNewPlayerPos(e.target.value as Position)}
-                  className="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {(Object.values(Position) as string[]).map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-2">
-                 <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-blue-600 hover:bg-blue-100 rounded-md">Cancelar</button>
-                 <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Guardar</button>
-              </div>
-            </form>
-          </Card>
-        )}
-
-        {players.length > 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <table className="w-full text-left">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                    <th className="px-6 py-4 font-semibold text-slate-600">Nome</th>
-                    <th className="px-6 py-4 font-semibold text-slate-600">Posição</th>
-                    <th className="px-6 py-4 font-semibold text-slate-600">Caps</th>
-                    <th className="px-6 py-4 font-semibold text-slate-600">Status</th>
-                    <th className="px-6 py-4 font-semibold text-slate-600 text-right">Ações</th>
-                </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                {players.map(player => (
-                    <tr key={player.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-800">{player.name}</td>
-                    <td className="px-6 py-4 text-slate-600">{player.position}</td>
-                    <td className="px-6 py-4 text-slate-600">{player.caps}</td>
-                    <td className="px-6 py-4">
-                        <StatusBadge status={player.status} />
-                    </td>
-                    <td className="px-6 py-4 text-right flex justify-end gap-2">
-                        <button 
-                        onClick={() => setEditingPlayer(player)}
-                        className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
-                        title="Editar Ficha de Jogador"
-                        >
-                        <IconEdit className="w-4 h-4" />
-                        </button>
-                        <button 
-                        onClick={() => removePlayer(player.id)}
-                        className="p-1 text-slate-400 hover:text-red-500 transition-colors"
-                        title="Remover Jogador"
-                        >
-                        <IconTrash className="w-4 h-4" />
-                        </button>
-                    </td>
-                    </tr>
-                ))}
-                </tbody>
-            </table>
-            </div>
-        ) : (
-            <div className="text-center py-20 bg-white border border-dashed border-slate-300 rounded-xl">
-                <IconUsers className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-700">Sem jogadores</h3>
-                <p className="text-slate-500 mb-6">Adicione manualmente ou importe um CSV/Excel.</p>
-                <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-blue-600 font-medium hover:underline"
-                >
-                    Importar do Excel (CSV)
-                </button>
-            </div>
-        )}
-      </div>
-    );
-};
-
-const TrainingView = ({ trainings, players, addTraining, updateTraining }: { trainings: TrainingSession[], players: Player[], addTraining: (t: TrainingSession) => void, updateTraining: (t: TrainingSession) => void }) => {
-  const [isAdding, setIsAdding] = useState(false);
-  const [newDate, setNewDate] = useState('');
-  const [newFocus, setNewFocus] = useState('');
-  const [loadingPlan, setLoadingPlan] = useState(false);
-  const [selectedTraining, setSelectedTraining] = useState<TrainingSession | null>(null);
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newDate || !newFocus) return;
-
-    // Initialize attendance for all players
-    const attendance: Record<string, AttendanceStatus> = {};
-    players.forEach(p => attendance[p.id] = AttendanceStatus.PRESENT);
-
-    const newTraining: TrainingSession = {
-      id: Date.now().toString(),
-      date: newDate,
-      focus: newFocus,
-      attendance: attendance
-    };
-
-    addTraining(newTraining);
-    setIsAdding(false);
-    setNewDate('');
-    setNewFocus('');
-  };
-
-  const handleGeneratePlan = async (training: TrainingSession) => {
-    setLoadingPlan(true);
-    const plan = await generateTrainingPlan(
-      Object.values(training.attendance).filter(s => s === AttendanceStatus.PRESENT).length,
-      training.focus,
-      players.map(p => p.position)
-    );
-    alert(plan); // Placeholder for viewing plan
-    setLoadingPlan(false);
-  };
-  
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">Treinos</h2>
-        <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-          <IconPlus className="w-4 h-4" /> Novo Treino
-        </button>
-      </div>
-
-      {isAdding && (
-         <Card className="bg-blue-50 border-blue-100 animate-in fade-in">
-           <form onSubmit={handleAdd} className="flex gap-4 items-end">
-             <div className="flex-1">
-               <label className="block text-sm font-medium text-blue-900 mb-1">Data</label>
-               <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="w-full px-3 py-2 rounded-md border border-blue-200" required />
-             </div>
-             <div className="flex-[2]">
-               <label className="block text-sm font-medium text-blue-900 mb-1">Foco do Treino</label>
-               <input type="text" value={newFocus} onChange={e => setNewFocus(e.target.value)} className="w-full px-3 py-2 rounded-md border border-blue-200" placeholder="Ex: Defesa em linha" required />
-             </div>
-             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Guardar</button>
-             <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-blue-600 hover:bg-blue-100 rounded-md">Cancelar</button>
-           </form>
-         </Card>
-      )}
-
-      {selectedTraining && (
-          <TrainingDetailsModal 
-            training={selectedTraining}
-            players={players}
-            onClose={() => setSelectedTraining(null)}
-            onSave={(updated) => {
-                updateTraining(updated);
-                setSelectedTraining(null);
-            }}
-          />
-      )}
-
-      <div className="grid gap-4">
-        {trainings.slice().reverse().map(t => (
-          <Card key={t.id} className="hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group" onClick={() => setSelectedTraining(t)}>
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-lg text-slate-800 group-hover:text-blue-600 transition-colors">{new Date(t.date).toLocaleDateString('pt-PT')}</h3>
-                <p className="text-slate-600">{t.focus}</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleGeneratePlan(t); }}
-                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium px-3 py-1 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors z-10"
-                >
-                  {loadingPlan ? 'A gerar...' : 'Gerar Plano AI'}
-                </button>
-                <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-600">
-                    {Object.values(t.attendance).filter(s => s === AttendanceStatus.PRESENT).length}
-                    </div>
-                    <div className="text-xs text-slate-400">Presentes</div>
-                </div>
-                <IconChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500" />
-              </div>
-            </div>
-          </Card>
-        ))}
-        {trainings.length === 0 && (
-            <div className="text-center py-10 text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
-                <IconCalendar className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                Nenhum treino registado.
-            </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Match[], players: Player[], addMatch: (m: Match) => void, updateMatch: (m: Match) => void }) => {
-    const [isAdding, setIsAdding] = useState(false);
-    const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
-    const [newMatchData, setNewMatchData] = useState({ opponent: '', date: '', location: 'Home' as 'Home' | 'Away' });
-
-    const handleAdd = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newMatchData.opponent || !newMatchData.date) return;
-        
-        const newMatch: Match = {
-            id: Date.now().toString(),
-            opponent: newMatchData.opponent,
-            date: newMatchData.date,
-            location: newMatchData.location,
-            playerStatus: {}, // Default empty, can auto-fill with Available
-            startingXV: Array(15).fill(''),
-            subs: [],
-            playingTime: {}
-        };
-        addMatch(newMatch);
-        setIsAdding(false);
-        setNewMatchData({ opponent: '', date: '', location: 'Home' });
-    };
-
-    return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-slate-800">Gestão de Jogos</h2>
-                <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                    <IconPlus className="w-4 h-4" /> Novo Jogo
-                </button>
-            </div>
-
-            {isAdding && (
-                 <Card className="bg-blue-50 border-blue-100 animate-in fade-in">
-                   <form onSubmit={handleAdd} className="flex gap-4 items-end">
-                     <div className="flex-[2]">
-                       <label className="block text-sm font-medium text-blue-900 mb-1">Adversário</label>
-                       <input 
-                            type="text" 
-                            value={newMatchData.opponent} 
-                            onChange={e => setNewMatchData({...newMatchData, opponent: e.target.value})} 
-                            className="w-full px-3 py-2 rounded-md border border-blue-200" 
-                            placeholder="Ex: CDUL" 
-                            required 
-                        />
-                     </div>
-                     <div className="flex-1">
-                       <label className="block text-sm font-medium text-blue-900 mb-1">Data</label>
-                       <input 
-                            type="date" 
-                            value={newMatchData.date} 
-                            onChange={e => setNewMatchData({...newMatchData, date: e.target.value})} 
-                            className="w-full px-3 py-2 rounded-md border border-blue-200" 
-                            required 
-                        />
-                     </div>
-                     <div className="flex-1">
-                        <label className="block text-sm font-medium text-blue-900 mb-1">Local</label>
-                        <select 
-                            value={newMatchData.location}
-                            onChange={e => setNewMatchData({...newMatchData, location: e.target.value as 'Home'|'Away'})}
-                            className="w-full px-3 py-2 rounded-md border border-blue-200"
-                        >
-                            <option value="Home">Casa</option>
-                            <option value="Away">Fora</option>
-                        </select>
-                     </div>
-                     <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Guardar</button>
-                     <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-blue-600 hover:bg-blue-100 rounded-md">Cancelar</button>
-                   </form>
-                 </Card>
-            )}
-
-            {selectedMatch && (
-                <MatchDetailsModal 
-                    match={selectedMatch}
-                    players={players}
-                    onClose={() => setSelectedMatch(null)}
-                    onSave={(updated) => { updateMatch(updated); setSelectedMatch(null); }}
-                />
-            )}
-
-            <div className="grid gap-4">
-                {matches.slice().sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(m => (
-                    <Card key={m.id} className="hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group" onClick={() => setSelectedMatch(m)}>
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-full ${m.location === 'Home' ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>
-                                    <IconTrophy className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-lg text-slate-800 group-hover:text-blue-600 transition-colors">{m.opponent}</h3>
-                                    <p className="text-slate-600 text-sm flex items-center gap-2">
-                                        {new Date(m.date).toLocaleDateString('pt-PT')}
-                                        <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                        {m.location === 'Home' ? 'Em Casa' : 'Fora'}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-6">
-                                <div className="text-right">
-                                    <p className="text-2xl font-bold text-slate-700">
-                                        {Object.values(m.playerStatus).filter(s => s === MatchSelectionStatus.SELECTED).length}
-                                    </p>
-                                    <p className="text-xs text-slate-400">Convocados</p>
-                                </div>
-                                <div className="h-8 w-[1px] bg-slate-200"></div>
-                                <div className="text-right">
-                                     <p className="text-2xl font-bold text-slate-700">
-                                        {(m.startingXV || []).filter(Boolean).length}
-                                    </p>
-                                    <p className="text-xs text-slate-400">XV Inicial</p>
-                                </div>
-                                <IconChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 ml-4" />
-                            </div>
-                        </div>
-                    </Card>
-                ))}
-                {matches.length === 0 && (
-                     <div className="text-center py-10 text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
-                        <IconTrophy className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                        Nenhum jogo agendado.
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
 // --- AICoachView Updated ---
 const AICoachView = () => {
     const [messages, setMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
@@ -1511,7 +1487,7 @@ const AICoachView = () => {
     const chatRef = useRef<any>(null);
 
     useEffect(() => {
-        // CORREÇÃO CRÍTICA: Tentar window.process.env primeiro
+        // CORREÇÃO CRÍTICA: Tentar window.process.env primeiro para garantir que lemos do index.html
         const apiKey = (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) 
                         || process.env.API_KEY;
         

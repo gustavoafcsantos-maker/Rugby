@@ -6,12 +6,13 @@ const MODEL_NAME = 'gemini-3-flash-preview';
 // Helper seguro para obter a instância da IA
 // Procura explicitamente no window.process.env definido no index.html se process.env falhar
 const getAIClient = () => {
+  // Tenta várias fontes para a API Key
   const apiKey = (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) 
                  || process.env.API_KEY;
                  
   if (!apiKey) {
-    console.error("API Key não encontrada!");
-    throw new Error("API Key em falta");
+    console.error("API Key não encontrada no ambiente!");
+    throw new Error("API Key em falta. Verifique o ficheiro index.html ou as variáveis de ambiente.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -45,9 +46,12 @@ export const generateTrainingPlan = async (
     });
 
     return response.text || "Não foi possível gerar o plano de treino.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico. Verifique a consola para mais detalhes sobre a API Key.";
+    if (error.toString().includes('403')) {
+      return "Erro 403: Acesso negado. Se estiver a usar um link publicado, verifique se a API Key permite este domínio na Google Cloud Console.";
+    }
+    return "Erro ao contactar o assistente técnico. Verifique a consola para detalhes.";
   }
 };
 
@@ -86,8 +90,11 @@ export const generateMatchStrategy = async (
     });
 
     return response.text || "Não foi possível gerar a estratégia.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Error:", error);
+    if (error.toString().includes('403')) {
+      return "Erro 403: Acesso negado. Verifique as restrições de domínio da sua API Key.";
+    }
     return "Erro ao contactar o assistente técnico.";
   }
 };

@@ -815,7 +815,104 @@ const DataManagementView = ({
     );
 };
 
-// --- Sub-View Components ---
+// --- AICoachView Updated ---
+const AICoachView = () => {
+    const [messages, setMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
+    const [input, setInput] = useState('');
+    const [loading, setLoading] = useState(false);
+    const chatRef = useRef<any>(null);
+
+    useEffect(() => {
+        // CORREÇÃO CRÍTICA: Tentar window.process.env primeiro
+        const apiKey = (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) 
+                        || process.env.API_KEY;
+        
+        if (!apiKey) {
+             setMessages(p => [...p, { role: 'model', text: '⚠️ A API Key da IA não foi encontrada. Se estiver a rodar localmente, verifique o ficheiro .env. Se for na produção, verifique o index.html.' }]);
+             return;
+        }
+
+        try {
+            const ai = new GoogleGenAI({ apiKey });
+            chatRef.current = ai.chats.create({ 
+                model: 'gemini-3-flash-preview', 
+                config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
+            });
+        } catch (e) {
+            console.error("Erro ao inicializar IA", e);
+            setMessages(p => [...p, { role: 'model', text: '⚠️ Erro interno ao iniciar o módulo de IA.' }]);
+        }
+    }, []);
+
+    const send = async () => {
+        if(!input.trim()) return;
+        
+        if (!chatRef.current) {
+             setMessages(p => [...p, { role: 'model', text: '⚠️ Erro: O chat não conseguiu conectar-se à Google AI. Verifique se a API Key está válida.' }]);
+             return;
+        }
+
+        const msg = input;
+        setInput('');
+        setMessages(p => [...p, { role: 'user', text: msg }]);
+        setLoading(true);
+        try {
+            const res = await chatRef.current.sendMessage({ message: msg });
+            setMessages(p => [...p, { role: 'model', text: res.text }]);
+        } catch(e: any) {
+            console.error(e);
+            let errorMsg = 'Desculpe, não consigo responder neste momento.';
+            if (e.toString().includes('403')) errorMsg = '⚠️ Erro 403: Acesso Negado. Se esta app estiver publicada, verifique se a API Key tem restrições de domínio (Referrer) na Google Cloud Console.';
+            if (e.toString().includes('400')) errorMsg = 'Erro 400: Pedido inválido.';
+            setMessages(p => [...p, { role: 'model', text: errorMsg }]);
+        }
+        setLoading(false);
+    };
+
+    return (
+        <Card className="h-[calc(100vh-8rem)] flex flex-col p-0 overflow-hidden">
+            <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                    <IconBrain className="w-5 h-5 text-indigo-600" />
+                    Assistente Técnico AI
+                </h3>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-4 p-4">
+                {messages.length === 0 && (
+                    <div className="text-center text-slate-400 mt-10">
+                        <IconBrain className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                        <p>Olá! Sou o teu adjunto virtual. <br/>Pergunta-me sobre exercícios de placagem, táticas de alinhamento ou gestão de fadiga.</p>
+                    </div>
+                )}
+                {messages.map((m, i) => (
+                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] p-3 rounded-2xl ${m.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-800 rounded-tl-none'}`}>
+                            <div className="prose prose-sm max-w-none">
+                                <ReactMarkdown>{m.text}</ReactMarkdown>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+                {loading && <div className="flex justify-start"><div className="bg-slate-100 px-4 py-2 rounded-2xl rounded-tl-none text-slate-500 text-sm animate-pulse">A pensar...</div></div>}
+            </div>
+            <div className="p-4 border-t border-slate-100 flex gap-2 bg-white">
+                <input 
+                    value={input} 
+                    onChange={e => setInput(e.target.value)} 
+                    onKeyDown={e => e.key === 'Enter' && send()}
+                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Escreve uma mensagem..."
+                    disabled={loading}
+                />
+                <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled={loading}>
+                    Enviar
+                </button>
+            </div>
+        </Card>
+    );
+};
+
+// --- Added Missing Views ---
 
 const DashboardView = ({ players, trainings, matches }: { players: Player[], trainings: TrainingSession[], matches: Match[] }) => {
     const totalPlayers = players.length;
@@ -1500,103 +1597,6 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
                 )}
             </div>
         </div>
-    );
-};
-
-// --- AICoachView Updated ---
-const AICoachView = () => {
-    const [messages, setMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
-    const [input, setInput] = useState('');
-    const [loading, setLoading] = useState(false);
-    const chatRef = useRef<any>(null);
-
-    useEffect(() => {
-        // CORREÇÃO CRÍTICA: Tentar window.process.env primeiro
-        const apiKey = (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) 
-                        || process.env.API_KEY;
-        
-        if (!apiKey) {
-             setMessages(p => [...p, { role: 'model', text: '⚠️ A API Key da IA não foi encontrada. Se estiver a rodar localmente, verifique o ficheiro .env. Se for na produção, verifique o index.html.' }]);
-             return;
-        }
-
-        try {
-            const ai = new GoogleGenAI({ apiKey });
-            chatRef.current = ai.chats.create({ 
-                model: 'gemini-3-flash-preview', 
-                config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
-            });
-        } catch (e) {
-            console.error("Erro ao inicializar IA", e);
-            setMessages(p => [...p, { role: 'model', text: '⚠️ Erro interno ao iniciar o módulo de IA.' }]);
-        }
-    }, []);
-
-    const send = async () => {
-        if(!input.trim()) return;
-        
-        if (!chatRef.current) {
-             setMessages(p => [...p, { role: 'model', text: '⚠️ Erro: O chat não conseguiu conectar-se à Google AI. Verifique se a API Key está válida.' }]);
-             return;
-        }
-
-        const msg = input;
-        setInput('');
-        setMessages(p => [...p, { role: 'user', text: msg }]);
-        setLoading(true);
-        try {
-            const res = await chatRef.current.sendMessage({ message: msg });
-            setMessages(p => [...p, { role: 'model', text: res.text }]);
-        } catch(e: any) {
-            console.error(e);
-            let errorMsg = 'Desculpe, não consigo responder neste momento.';
-            if (e.toString().includes('403')) errorMsg = 'Erro 403: Chave de API inválida ou sem permissões.';
-            if (e.toString().includes('400')) errorMsg = 'Erro 400: Pedido inválido.';
-            setMessages(p => [...p, { role: 'model', text: errorMsg }]);
-        }
-        setLoading(false);
-    };
-
-    return (
-        <Card className="h-[calc(100vh-8rem)] flex flex-col p-0 overflow-hidden">
-            <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                    <IconBrain className="w-5 h-5 text-indigo-600" />
-                    Assistente Técnico AI
-                </h3>
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-4 p-4">
-                {messages.length === 0 && (
-                    <div className="text-center text-slate-400 mt-10">
-                        <IconBrain className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                        <p>Olá! Sou o teu adjunto virtual. <br/>Pergunta-me sobre exercícios de placagem, táticas de alinhamento ou gestão de fadiga.</p>
-                    </div>
-                )}
-                {messages.map((m, i) => (
-                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] p-3 rounded-2xl ${m.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-800 rounded-tl-none'}`}>
-                            <div className="prose prose-sm max-w-none">
-                                <ReactMarkdown>{m.text}</ReactMarkdown>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-                {loading && <div className="flex justify-start"><div className="bg-slate-100 px-4 py-2 rounded-2xl rounded-tl-none text-slate-500 text-sm animate-pulse">A pensar...</div></div>}
-            </div>
-            <div className="p-4 border-t border-slate-100 flex gap-2 bg-white">
-                <input 
-                    value={input} 
-                    onChange={e => setInput(e.target.value)} 
-                    onKeyDown={e => e.key === 'Enter' && send()}
-                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Escreve uma mensagem..."
-                    disabled={loading}
-                />
-                <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled={loading}>
-                    Enviar
-                </button>
-            </div>
-        </Card>
     );
 };
 

@@ -5,12 +5,7 @@ const MODEL_NAME = 'gemini-3-flash-preview';
 
 // Helper seguro para obter a instância da IA
 const getAIClient = () => {
-  // Acede via window.process para garantir compatibilidade no browser se o bundler não substituir
-  const apiKey = (window as any).process?.env?.API_KEY || process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key não encontrada");
-  }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 export const generateTrainingPlan = async (

@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { 
-  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload
+  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDownload, IconDatabase, IconSettings, IconCloud, IconCopy, IconPaste, IconInfo, IconRefresh
 } from './components/Icons';
 import { 
   Player, Position, PlayerStatus, TrainingSession, Match, ViewState, AttendanceStatus, MatchSelectionStatus
@@ -13,6 +13,36 @@ import { generateTrainingPlan, generateMatchStrategy } from './services/geminiSe
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI } from "@google/genai";
 import * as XLSX from 'xlsx';
+
+// --- Helper Functions for Persistence ---
+const loadState = <T,>(key: string, fallback: T): T => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved === null) return fallback;
+    return JSON.parse(saved);
+  } catch (e) {
+    console.error(`Erro ao carregar ${key}:`, e);
+    return fallback;
+  }
+};
+
+const saveState = <T,>(key: string, data: T) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error(`Erro ao guardar ${key}:`, e);
+  }
+};
+
+// --- Debounce Helper for Auto-Save ---
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 // --- Helper Components ---
 const StatusBadge = ({ status }: { status: PlayerStatus }) => {
@@ -53,22 +83,19 @@ const PlayerDetailsModal = ({
   const [activeTab, setActiveTab] = useState<'details' | 'stats'>('details');
 
   // --- Statistics Calculation ---
-  
-  // Training Stats
   const playerTrainings = trainings.filter(t => t.attendance[player.id]);
   const totalTrainings = playerTrainings.length;
   const presentCount = playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.PRESENT).length;
   const attendanceRate = totalTrainings > 0 ? Math.round((presentCount / totalTrainings) * 100) : 0;
   
   const trainingDistribution = [
-    { name: 'Presente', value: presentCount, color: '#10b981' }, // Emerald
-    { name: 'Lesionado', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.INJURED).length, color: '#ef4444' }, // Red
-    { name: 'Trabalho/Esc', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.WORK_SCHOOL).length, color: '#3b82f6' }, // Blue
-    { name: 'Indisp.', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.UNAVAILABLE).length, color: '#f59e0b' }, // Amber
-    { name: 'Falta', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.ABSENT).length, color: '#64748b' }, // Slate
+    { name: 'Presente', value: presentCount, color: '#10b981' }, 
+    { name: 'Lesionado', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.INJURED).length, color: '#ef4444' }, 
+    { name: 'Trabalho/Esc', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.WORK_SCHOOL).length, color: '#3b82f6' }, 
+    { name: 'Indisp.', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.UNAVAILABLE).length, color: '#f59e0b' }, 
+    { name: 'Falta', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.ABSENT).length, color: '#64748b' }, 
   ].filter(d => d.value > 0);
 
-  // Match Stats
   const totalMatches = matches.length;
   const selectedMatches = matches.filter(m => m.playerStatus[player.id] === MatchSelectionStatus.SELECTED);
   const starts = matches.filter(m => m.startingXV.includes(player.id)).length;
@@ -113,20 +140,9 @@ const PlayerDetailsModal = ({
           </button>
         </div>
         
-        {/* Tabs */}
         <div className="flex border-b border-slate-200 shrink-0">
-            <button 
-                onClick={() => setActiveTab('details')}
-                className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'details' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                Dados Pessoais
-            </button>
-            <button 
-                onClick={() => setActiveTab('stats')}
-                className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'stats' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                Estatísticas & Performance
-            </button>
+            <button onClick={() => setActiveTab('details')} className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'details' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Dados Pessoais</button>
+            <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'stats' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Estatísticas & Performance</button>
         </div>
         
         <div className="overflow-y-auto p-6">
@@ -135,110 +151,48 @@ const PlayerDetailsModal = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
-                <input 
-                    name="name" 
-                    value={formData.name} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    required
-                />
+                <input name="name" value={formData.name} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" required />
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Posição</label>
-                <select 
-                    name="position" 
-                    value={formData.position} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                >
+                <select name="position" value={formData.position} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                     {(Object.values(Position) as string[]).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                <select 
-                    name="status" 
-                    value={formData.status} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                >
+                <select name="status" value={formData.status} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                     {(Object.values(PlayerStatus) as string[]).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Data de Nascimento</label>
-                <input 
-                    type="date"
-                    name="birthDate" 
-                    value={formData.birthDate || ''} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                />
+                <input type="date" name="birthDate" value={formData.birthDate || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Localidade</label>
-                <input 
-                    type="text"
-                    name="locality" 
-                    value={formData.locality || ''} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    placeholder="Ex: Lisboa"
-                />
+                <input type="text" name="locality" value={formData.locality || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Ex: Lisboa" />
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Altura (cm)</label>
-                <input 
-                    type="number"
-                    name="height" 
-                    value={formData.height || ''} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    placeholder="Ex: 185"
-                />
+                <input type="number" name="height" value={formData.height || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Ex: 185" />
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Peso (kg)</label>
-                <input 
-                    type="number"
-                    name="weight" 
-                    value={formData.weight || ''} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    placeholder="Ex: 95"
-                />
+                <input type="number" name="weight" value={formData.weight || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Ex: 95" />
                 </div>
-
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Internacionalizações (Caps)</label>
-                <input 
-                    type="number"
-                    name="caps" 
-                    value={formData.caps} 
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                />
+                <input type="number" name="caps" value={formData.caps} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
                 </div>
             </div>
-            
             <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-                <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">
-                Cancelar
-                </button>
-                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
-                Guardar Alterações
-                </button>
+                <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
+                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">Guardar Alterações</button>
             </div>
             </form>
         ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
-                {/* Highlights */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
                         <p className="text-emerald-800 text-sm font-medium flex items-center gap-2"><IconCheck className="w-4 h-4"/> Assiduidade</p>
@@ -260,27 +214,15 @@ const PlayerDetailsModal = ({
                         <p className="text-lg font-bold text-slate-700 mt-2 truncate">{player.position}</p>
                     </div>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Training Chart */}
                     <div>
                         <h3 className="text-lg font-bold text-slate-800 mb-4">Análise de Treinos</h3>
                          <div className="h-64 border border-slate-100 rounded-xl bg-slate-50/50 p-4">
                             {totalTrainings > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie
-                                        data={trainingDistribution}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={80}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                        >
-                                        {trainingDistribution.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
+                                        <Pie data={trainingDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                        {trainingDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                                         </Pie>
                                         <Tooltip />
                                         <Legend />
@@ -291,8 +233,6 @@ const PlayerDetailsModal = ({
                             )}
                         </div>
                     </div>
-
-                    {/* Selection Breakdown */}
                     <div>
                          <h3 className="text-lg font-bold text-slate-800 mb-4">Análise de Não Convocatória</h3>
                          <div className="space-y-3">
@@ -322,8 +262,7 @@ const PlayerDetailsModal = ({
   );
 };
 
-// --- New Component: Training Details Modal ---
-
+// --- Training Details Modal ---
 const TrainingDetailsModal = ({ 
     training, 
     players, 
@@ -337,7 +276,6 @@ const TrainingDetailsModal = ({
 }) => {
     const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>(training.attendance || {});
 
-    // Ensure all players are in the attendance object (for new players added after training creation)
     useEffect(() => {
         const newAttendance = { ...attendance };
         let changed = false;
@@ -421,8 +359,7 @@ const TrainingDetailsModal = ({
     );
 };
 
-// --- New Component: Match Details Modal ---
-
+// --- Match Details Modal ---
 const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, players: Player[], onClose: () => void, onSave: (m: Match) => void }) => {
     const [activeTab, setActiveTab] = useState<'selection' | 'lineup' | 'strategy'>('selection');
     const [localMatch, setLocalMatch] = useState<Match>(match);
@@ -437,7 +374,6 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
         let newXV = [...(localMatch.startingXV || [])];
         let newSubs = [...(localMatch.subs || [])];
         
-        // Remove from Lineup if not selected
         if (status !== MatchSelectionStatus.SELECTED) {
             newXV = newXV.map(id => id === playerId ? '' : id);
             newSubs = newSubs.filter(id => id !== playerId);
@@ -448,15 +384,11 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     const handleLineupChange = (index: number, playerId: string, isSub: boolean = false) => {
         if (isSub) {
              const newSubs = [...(localMatch.subs || [])];
-             // Remove if exists elsewhere in subs
              const existingIdx = newSubs.indexOf(playerId);
              if (existingIdx !== -1) newSubs.splice(existingIdx, 1);
              
-             // Ensure array size logic if needed, but for subs usually just push/pop. 
-             // Let's implement fixed slots for subs 16-23 (8 slots)
              while(newSubs.length < 8) newSubs.push('');
              
-             // Check if in XV
              const xvIdx = (localMatch.startingXV || []).indexOf(playerId);
              if (xvIdx !== -1) {
                   const newXV = [...(localMatch.startingXV || [])];
@@ -467,15 +399,12 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
              newSubs[index] = playerId;
              updateMatch({ subs: newSubs });
         } else {
-            // XV Logic
             const newXV = [...(localMatch.startingXV || [])];
             while(newXV.length < 15) newXV.push('');
             
-            // Remove from other XV slot
             const existingXVIdx = newXV.indexOf(playerId);
             if (existingXVIdx !== -1 && existingXVIdx !== index) newXV[existingXVIdx] = '';
             
-            // Remove from Subs
             let newSubs = [...(localMatch.subs || [])];
             if (newSubs.includes(playerId)) {
                 newSubs = newSubs.filter(id => id !== playerId);
@@ -648,6 +577,239 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
                         </div>
                     )}
                 </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Data Management View (RESTORED) ---
+const DataManagementView = ({ 
+    players, 
+    trainings, 
+    matches, 
+    onSetCloudConfig,
+    cloudConfig,
+    onDisconnect
+}: { 
+    players: Player[], 
+    trainings: TrainingSession[], 
+    matches: Match[],
+    onSetCloudConfig: (config: { apiKey: string, binId: string }) => void,
+    cloudConfig: { apiKey: string, binId: string } | null,
+    onDisconnect: () => void
+}) => {
+    const [jsonBinConfig, setJsonBinConfig] = useState({ 
+        apiKey: cloudConfig?.apiKey || '', 
+        binId: cloudConfig?.binId || '' 
+    });
+    
+    const [magicLink, setMagicLink] = useState('');
+    const [isCreatingBin, setIsCreatingBin] = useState(false);
+
+    useEffect(() => {
+        if (jsonBinConfig.apiKey && jsonBinConfig.binId) {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const params = new URLSearchParams();
+            params.set('binId', jsonBinConfig.binId);
+            params.set('apiKey', jsonBinConfig.apiKey);
+            setMagicLink(`${baseUrl}?${params.toString()}`);
+        } else {
+            setMagicLink('');
+        }
+    }, [jsonBinConfig]);
+
+    useEffect(() => {
+        if (cloudConfig) {
+            setJsonBinConfig(cloudConfig);
+        }
+    }, [cloudConfig]);
+
+    const handleSaveConfig = () => {
+        if (!jsonBinConfig.apiKey || !jsonBinConfig.binId) {
+            alert("Preencha ambos os campos.");
+            return;
+        }
+        onSetCloudConfig(jsonBinConfig);
+    };
+
+    const handleAutoCreateBin = async () => {
+        if (!jsonBinConfig.apiKey) {
+            alert("Por favor, cole a sua X-Master-Key primeiro.");
+            return;
+        }
+        
+        setIsCreatingBin(true);
+        try {
+            const response = await fetch('https://api.jsonbin.io/v3/b', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': jsonBinConfig.apiKey,
+                    'X-Bin-Name': 'RugbyManager_Data'
+                },
+                body: JSON.stringify({ 
+                    info: "Initial Rugby Manager Data",
+                    players: players, 
+                    created_at: new Date().toISOString()
+                })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok && data.metadata && data.metadata.id) {
+                setJsonBinConfig(prev => ({ ...prev, binId: data.metadata.id }));
+                alert("Bin criado com sucesso! O ID foi preenchido automaticamente. Clique em 'Ativar Sincronização'.");
+            } else {
+                console.error("Erro ao criar bin:", data);
+                alert("Erro ao criar Bin. Verifique se a sua Key está correta.\nErro: " + (data.message || 'Desconhecido'));
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erro de conexão ao JSONBin.io");
+        }
+        setIsCreatingBin(false);
+    };
+
+    const handleCopyLink = () => {
+        if (!magicLink) return;
+        navigator.clipboard.writeText(magicLink);
+        alert("Link copiado! Guarde-o ou envie para os seus outros dispositivos.");
+    };
+
+    return (
+        <div className="space-y-8 pb-10">
+            <div>
+                <h2 className="text-2xl font-bold text-slate-800">Sincronização Cloud</h2>
+                <p className="text-slate-500 mt-2">
+                    Ligue a sua conta gratuita JSONBin.io para ter os seus dados em qualquer lugar, automaticamente.
+                </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* 1. Setup */}
+                <Card className={`border-l-4 ${cloudConfig ? 'border-green-500' : 'border-slate-300'}`}>
+                     <div className="flex items-start gap-4">
+                        <div className={`p-3 rounded-lg ${cloudConfig ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-600'}`}>
+                            <IconCloud className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                1. Configurar Cloud
+                                {cloudConfig && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">Ativo</span>}
+                            </h3>
+                            <p className="text-slate-600 text-sm mt-1 mb-4">
+                                Crie uma conta em <a href="https://jsonbin.io" target="_blank" className="text-blue-600 underline">jsonbin.io</a>, obtenha a sua API Key e cole-a aqui.
+                            </p>
+                            
+                            <div className="grid gap-4 mb-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">X-Master-Key (API Key)</label>
+                                    <input 
+                                        type="password" 
+                                        value={jsonBinConfig.apiKey}
+                                        onChange={e => setJsonBinConfig({...jsonBinConfig, apiKey: e.target.value})}
+                                        className="w-full px-3 py-2 border rounded-md text-sm"
+                                        placeholder="Ex: $2b$10$..."
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1">Encontre em: Profile Avatar &gt; API Keys &gt; Create New</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Bin ID</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={jsonBinConfig.binId}
+                                            onChange={e => setJsonBinConfig({...jsonBinConfig, binId: e.target.value})}
+                                            className="w-full px-3 py-2 border rounded-md text-sm"
+                                            placeholder="Ex: 67ab..."
+                                        />
+                                        <button 
+                                            onClick={handleAutoCreateBin}
+                                            disabled={isCreatingBin || !jsonBinConfig.apiKey}
+                                            className="shrink-0 px-3 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
+                                            title="Cria um Bin vazio automaticamente usando a sua Key"
+                                        >
+                                            {isCreatingBin ? 'A criar...' : 'Gerar ID'}
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">Cole um ID existente ou clique em "Gerar ID" para criar um novo.</p>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={handleSaveConfig}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full mb-2"
+                            >
+                                {cloudConfig ? 'Atualizar Configuração' : 'Ativar Sincronização'}
+                            </button>
+                            
+                            {cloudConfig && (
+                                <button 
+                                    onClick={onDisconnect}
+                                    className="border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full flex items-center justify-center gap-2"
+                                >
+                                    <IconX className="w-4 h-4" />
+                                    Desconectar / Resetar
+                                </button>
+                            )}
+
+                            <details className="mt-4 text-xs text-slate-500 cursor-pointer group">
+                                <summary className="flex items-center gap-1 font-medium hover:text-indigo-600 transition-colors">
+                                    <IconInfo className="w-3 h-3" />
+                                    Como fazer manualmente?
+                                </summary>
+                                <div className="mt-2 pl-2 border-l-2 border-slate-200 space-y-2 bg-slate-50 p-2 rounded-r-lg">
+                                    <p>1. Vá a <a href="https://jsonbin.io" target="_blank" className="text-indigo-600 underline">jsonbin.io</a> e faça login.</p>
+                                    <p>2. Clique em <strong>+ Create New</strong>.</p>
+                                    <p>3. <strong>IMPORTANTE:</strong> Escreva <code>{`{"dados": "inicio"}`}</code> no editor. O JSONBin proíbe Bins vazios.</p>
+                                    <p>4. Clique no ícone de disquete (Save). Copie o <strong>Bin ID</strong> do topo.</p>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </Card>
+
+                {/* 2. Magic Link */}
+                <Card className={`border-l-4 ${magicLink ? 'border-purple-500' : 'border-slate-200'}`}>
+                    <div className="flex items-start gap-4">
+                        <div className={`p-3 rounded-lg ${magicLink ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-400'}`}>
+                            <IconCopy className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-lg text-slate-800">2. Link de Acesso Universal</h3>
+                            <p className="text-slate-600 text-sm mt-1 mb-4">
+                                Este link contém as suas chaves. <strong>Guarde-o nos favoritos</strong>. 
+                                Sempre que abrir este link, os seus dados serão carregados automaticamente.
+                            </p>
+                            
+                            {magicLink ? (
+                                <>
+                                    <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-2 break-all text-xs font-mono text-slate-600">
+                                        {magicLink}
+                                    </div>
+                                    <p className="text-xs text-emerald-600 font-medium mb-4 flex items-center gap-1">
+                                        <IconCheck className="w-3 h-3" />
+                                        O link é permanente. Não muda ao editar dados.
+                                    </p>
+                                </>
+                            ) : (
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-4 text-xs font-mono text-slate-400 italic">
+                                    Preencha as chaves à esquerda para gerar o link...
+                                </div>
+                            )}
+
+                            <button 
+                                onClick={handleCopyLink}
+                                disabled={!magicLink}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${magicLink ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                            >
+                                <IconCopy className="w-4 h-4" />
+                                Copiar Link Mágico
+                            </button>
+                        </div>
+                    </div>
+                </Card>
             </div>
         </div>
     );
@@ -1097,8 +1259,6 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
     );
 };
 
-// --- Missing Views & Main App ---
-
 const TrainingView = ({ trainings, players, addTraining, updateTraining }: { trainings: TrainingSession[], players: Player[], addTraining: (t: TrainingSession) => void, updateTraining: (t: TrainingSession) => void }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newDate, setNewDate] = useState('');
@@ -1343,6 +1503,7 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
     );
 };
 
+// --- AICoachView Updated ---
 const AICoachView = () => {
     const [messages, setMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
     const [input, setInput] = useState('');
@@ -1350,15 +1511,33 @@ const AICoachView = () => {
     const chatRef = useRef<any>(null);
 
     useEffect(() => {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        chatRef.current = ai.chats.create({ 
-            model: 'gemini-3-flash-preview', 
-            config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
-        });
+        const apiKey = (window as any).process?.env?.API_KEY || process.env.API_KEY;
+        // Check if it's the placeholder key or empty
+        if (!apiKey || apiKey.startsWith("AIzaSyCYKKJCX_qoBC")) {
+             setMessages(p => [...p, { role: 'model', text: '⚠️ A API Key da IA não está configurada corretamente no ambiente (index.html). Por favor verifique o código.' }]);
+             return;
+        }
+
+        try {
+            const ai = new GoogleGenAI({ apiKey });
+            chatRef.current = ai.chats.create({ 
+                model: 'gemini-3-flash-preview', 
+                config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
+            });
+        } catch (e) {
+            console.error("Erro ao inicializar IA", e);
+            setMessages(p => [...p, { role: 'model', text: '⚠️ Erro interno ao iniciar o módulo de IA.' }]);
+        }
     }, []);
 
     const send = async () => {
         if(!input.trim()) return;
+        
+        if (!chatRef.current) {
+             setMessages(p => [...p, { role: 'model', text: '⚠️ Erro: O chat não conseguiu conectar-se à Google AI. Verifique a API Key.' }]);
+             return;
+        }
+
         const msg = input;
         setInput('');
         setMessages(p => [...p, { role: 'user', text: msg }]);
@@ -1366,15 +1545,19 @@ const AICoachView = () => {
         try {
             const res = await chatRef.current.sendMessage({ message: msg });
             setMessages(p => [...p, { role: 'model', text: res.text }]);
-        } catch(e) {
-            setMessages(p => [...p, { role: 'model', text: 'Desculpe, não consigo responder neste momento.' }]);
+        } catch(e: any) {
+            console.error(e);
+            let errorMsg = 'Desculpe, não consigo responder neste momento.';
+            if (e.toString().includes('403')) errorMsg = 'Erro 403: Chave de API inválida ou expirada.';
+            if (e.toString().includes('400')) errorMsg = 'Erro 400: Pedido inválido.';
+            setMessages(p => [...p, { role: 'model', text: errorMsg }]);
         }
         setLoading(false);
     };
 
     return (
         <Card className="h-[calc(100vh-8rem)] flex flex-col p-0 overflow-hidden">
-            <div className="bg-slate-50 p-4 border-b border-slate-200">
+            <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                     <IconBrain className="w-5 h-5 text-indigo-600" />
                     Assistente Técnico AI
@@ -1405,6 +1588,7 @@ const AICoachView = () => {
                     onKeyDown={e => e.key === 'Enter' && send()}
                     className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Escreve uma mensagem..."
+                    disabled={loading}
                 />
                 <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled={loading}>
                     Enviar
@@ -1421,6 +1605,7 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
     { id: 'TRAINING', label: 'Treinos', icon: IconCalendar },
     { id: 'MATCHES', label: 'Jogos', icon: IconTrophy },
     { id: 'AI_COACH', label: 'Assistente AI', icon: IconBrain },
+    { id: 'DATA', label: 'Nuvem & Links', icon: IconCloud },
   ];
 
   return (
@@ -1452,37 +1637,131 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
 
 const App = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
+  const [cloudConfig, setCloudConfig] = useState<{apiKey: string, binId: string} | null>(() => {
+      // Load config from LocalStorage if available
+      const k = localStorage.getItem('jsonbin_api_key');
+      const b = localStorage.getItem('jsonbin_bin_id');
+      return k && b ? { apiKey: k, binId: b } : null;
+  });
   
   // --- STATE INITIALIZATION WITH PERSISTENCE ---
-  const [players, setPlayers] = useState<Player[]>(() => {
-    const saved = localStorage.getItem('rugby_manager_players');
-    return saved ? JSON.parse(saved) : INITIAL_PLAYERS;
-  });
-  
-  const [trainings, setTrainings] = useState<TrainingSession[]>(() => {
-    const saved = localStorage.getItem('rugby_manager_trainings');
-    return saved ? JSON.parse(saved) : INITIAL_TRAININGS;
-  });
-  
-  const [matches, setMatches] = useState<Match[]>(() => {
-    const saved = localStorage.getItem('rugby_manager_matches');
-    return saved ? JSON.parse(saved) : INITIAL_MATCHES;
-  });
+  const [players, setPlayers] = useState<Player[]>(() => loadState('rugby_manager_players', INITIAL_PLAYERS));
+  const [trainings, setTrainings] = useState<TrainingSession[]>(() => loadState('rugby_manager_trainings', INITIAL_TRAININGS));
+  const [matches, setMatches] = useState<Match[]>(() => loadState('rugby_manager_matches', INITIAL_MATCHES));
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  // --- PERSISTENCE EFFECTS ---
-  useEffect(() => {
-    localStorage.setItem('rugby_manager_players', JSON.stringify(players));
-  }, [players]);
+  // --- AUTO-LOAD FROM URL OR CLOUD ---
+  const loadFromCloud = useCallback(async (activeConfig = cloudConfig) => {
+      if (!activeConfig) return;
+      
+      setIsSyncing(true);
+      try {
+          console.log("A carregar dados da nuvem...");
+          const res = await fetch(`https://api.jsonbin.io/v3/b/${activeConfig.binId}/latest`, {
+              headers: { 'X-Master-Key': activeConfig.apiKey }
+          });
+          
+          if (res.status === 403 || res.status === 401) {
+              alert("Erro de Permissão (403): A sua API Key não tem acesso a este Bin ID.\n\nMotivo provável: Este Bin foi criado por outra conta ou a Key está incorreta.\n\nSolução: Vá ao separador 'Nuvem', clique em 'Desconectar' e crie um novo Bin.");
+              throw new Error("Permissão negada");
+          }
+
+          if (!res.ok) throw new Error("Falha na cloud");
+          const json = await res.json();
+          const data = json.record;
+          
+          // Simple strategy: Overwrite local if cloud exists
+          if (data.players) setPlayers(data.players);
+          if (data.trainings) setTrainings(data.trainings);
+          if (data.matches) setMatches(data.matches);
+          console.log("Dados sincronizados com sucesso!");
+      } catch (e) {
+          console.error("Erro ao sincronizar:", e);
+      } finally {
+          setIsSyncing(false);
+      }
+  }, [cloudConfig]);
 
   useEffect(() => {
-    localStorage.setItem('rugby_manager_trainings', JSON.stringify(trainings));
-  }, [trainings]);
+      const initCloud = async () => {
+          // 1. Check URL Params (Priority)
+          const params = new URLSearchParams(window.location.search);
+          const urlBinId = params.get('binId');
+          const urlApiKey = params.get('apiKey');
+
+          if (urlBinId && urlApiKey) {
+              const newConfig = { apiKey: urlApiKey, binId: urlBinId };
+              setCloudConfig(newConfig);
+              // Persist locally too so it works on refresh without params
+              localStorage.setItem('jsonbin_api_key', urlApiKey);
+              localStorage.setItem('jsonbin_bin_id', urlBinId);
+              loadFromCloud(newConfig);
+          } else if (cloudConfig) {
+              loadFromCloud(cloudConfig);
+          }
+      };
+      initCloud();
+  }, []); // Run once on mount
+
+  // --- PERSISTENCE EFFECTS (LOCAL) ---
+  useEffect(() => { saveState('rugby_manager_players', players); }, [players]);
+  useEffect(() => { saveState('rugby_manager_trainings', trainings); }, [trainings]);
+  useEffect(() => { saveState('rugby_manager_matches', matches); }, [matches]);
+
+  // --- AUTO-SAVE TO CLOUD (DEBOUNCED) ---
+  const debouncedPlayers = useDebounce(players, 2000);
+  const debouncedTrainings = useDebounce(trainings, 2000);
+  const debouncedMatches = useDebounce(matches, 2000);
 
   useEffect(() => {
-    localStorage.setItem('rugby_manager_matches', JSON.stringify(matches));
-  }, [matches]);
+      const syncToCloud = async () => {
+          if (!cloudConfig) return;
+          // Avoid auto-saving empty initial states over existing cloud data
+          if (debouncedPlayers.length === 0 && debouncedTrainings.length === 0 && debouncedMatches.length === 0) return;
+
+          try {
+              const data = { 
+                  players: debouncedPlayers, 
+                  trainings: debouncedTrainings, 
+                  matches: debouncedMatches, 
+                  version: "1.0", 
+                  timestamp: new Date().toISOString() 
+              };
+              const res = await fetch(`https://api.jsonbin.io/v3/b/${cloudConfig.binId}`, {
+                  method: 'PUT',
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'X-Master-Key': cloudConfig.apiKey
+                  },
+                  body: JSON.stringify(data)
+              });
+              
+              if (res.status === 403) {
+                  console.error("Erro 403 no auto-save: Permissão negada");
+              }
+          } catch(e) {
+              console.error("Erro no auto-save:", e);
+          }
+      };
+      syncToCloud();
+  }, [debouncedPlayers, debouncedTrainings, debouncedMatches, cloudConfig]);
+
 
   // --- ACTIONS ---
+  const handleDisconnect = () => {
+      if (window.confirm("Tem a certeza? Isto irá desligar a sincronização. Certifique-se que tem a API Key guardada se quiser reconectar depois.")) {
+          localStorage.removeItem('jsonbin_api_key');
+          localStorage.removeItem('jsonbin_bin_id');
+          setCloudConfig(null);
+          // Opcional: Limpar URL params para não reconectar automaticamente no refresh
+          const url = new URL(window.location.href);
+          url.searchParams.delete('apiKey');
+          url.searchParams.delete('binId');
+          window.history.replaceState({}, '', url);
+          alert("Desconectado com sucesso.");
+      }
+  };
+
   const addPlayer = (p: Player) => setPlayers(prev => [...prev, p]);
   const removePlayer = (id: string) => setPlayers(prev => prev.filter(p => p.id !== id));
   const updatePlayer = (p: Player) => setPlayers(prev => prev.map(current => current.id === p.id ? p : current));
@@ -1498,20 +1777,48 @@ const App = () => {
       <Sidebar view={view} setView={setView} />
       <main className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto min-h-full">
-            {/* Mobile Nav Toggle could go here */}
-            <div className="md:hidden mb-4 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-                 <h1 className="font-bold text-slate-800">Rugby Manager</h1>
-                 <select 
-                    value={view} 
-                    onChange={(e) => setView(e.target.value as ViewState)}
-                    className="bg-slate-100 border-none rounded-md px-2 py-1 text-sm"
-                 >
-                     <option value="DASHBOARD">Dashboard</option>
-                     <option value="ROSTER">Plantel</option>
-                     <option value="TRAINING">Treinos</option>
-                     <option value="MATCHES">Jogos</option>
-                     <option value="AI_COACH">AI Coach</option>
-                 </select>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                 <div className="md:hidden flex justify-between items-center bg-white p-4 rounded-lg shadow-sm w-full">
+                     <h1 className="font-bold text-slate-800">Rugby Manager</h1>
+                     <select 
+                        value={view} 
+                        onChange={(e) => setView(e.target.value as ViewState)}
+                        className="bg-slate-100 border-none rounded-md px-2 py-1 text-sm"
+                     >
+                         <option value="DASHBOARD">Dashboard</option>
+                         <option value="ROSTER">Plantel</option>
+                         <option value="TRAINING">Treinos</option>
+                         <option value="MATCHES">Jogos</option>
+                         <option value="AI_COACH">AI Coach</option>
+                         <option value="DATA">Cloud</option>
+                     </select>
+                 </div>
+                 
+                 {/* Cloud Status Indicator (Desktop) */}
+                 <div className="hidden md:flex items-center gap-4 ml-auto">
+                    {cloudConfig ? (
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={() => loadFromCloud()} 
+                                disabled={isSyncing}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-medium transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                                title="Forçar atualização da Cloud"
+                            >
+                                <IconRefresh className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
+                                {isSyncing ? 'A Sincronizar...' : 'Sincronizar Agora'}
+                            </button>
+                            <span className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                <IconCloud className="w-3 h-3" />
+                                Online
+                            </span>
+                        </div>
+                    ) : (
+                        <button onClick={() => setView('DATA')} className="flex items-center gap-2 px-3 py-1 bg-slate-200 text-slate-600 hover:bg-slate-300 rounded-full text-xs font-medium transition-colors">
+                            <IconCloud className="w-3 h-3" />
+                            Offline
+                        </button>
+                    )}
+                 </div>
             </div>
 
           {view === 'DASHBOARD' && <DashboardView players={players} trainings={trainings} matches={matches} />}
@@ -1519,6 +1826,21 @@ const App = () => {
           {view === 'TRAINING' && <TrainingView trainings={trainings} players={players} addTraining={addTraining} updateTraining={updateTraining} />}
           {view === 'MATCHES' && <MatchesView matches={matches} players={players} addMatch={addMatch} updateMatch={updateMatch} />}
           {view === 'AI_COACH' && <AICoachView />}
+          {view === 'DATA' && (
+            <DataManagementView 
+                players={players} 
+                trainings={trainings} 
+                matches={matches} 
+                cloudConfig={cloudConfig}
+                onSetCloudConfig={(cfg) => {
+                    setCloudConfig(cfg);
+                    localStorage.setItem('jsonbin_api_key', cfg.apiKey);
+                    localStorage.setItem('jsonbin_bin_id', cfg.binId);
+                    loadFromCloud(cfg);
+                }}
+                onDisconnect={handleDisconnect}
+            />
+          )}
         </div>
       </main>
     </div>

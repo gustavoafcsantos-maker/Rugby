@@ -1512,8 +1512,9 @@ const AICoachView = () => {
 
     useEffect(() => {
         const apiKey = (window as any).process?.env?.API_KEY || process.env.API_KEY;
-        // Check if it's the placeholder key or empty
-        if (!apiKey || apiKey.startsWith("AIzaSyCYKKJCX_qoBC")) {
+        
+        // CORREÇÃO: Removemos a validação que impedia chaves começando por 'AIzaSy'
+        if (!apiKey) {
              setMessages(p => [...p, { role: 'model', text: '⚠️ A API Key da IA não está configurada corretamente no ambiente (index.html). Por favor verifique o código.' }]);
              return;
         }
@@ -1548,7 +1549,7 @@ const AICoachView = () => {
         } catch(e: any) {
             console.error(e);
             let errorMsg = 'Desculpe, não consigo responder neste momento.';
-            if (e.toString().includes('403')) errorMsg = 'Erro 403: Chave de API inválida ou expirada.';
+            if (e.toString().includes('403')) errorMsg = 'Erro 403: Chave de API inválida ou sem permissões.';
             if (e.toString().includes('400')) errorMsg = 'Erro 400: Pedido inválido.';
             setMessages(p => [...p, { role: 'model', text: errorMsg }]);
         }

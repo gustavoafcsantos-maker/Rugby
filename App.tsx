@@ -1511,11 +1511,12 @@ const AICoachView = () => {
     const chatRef = useRef<any>(null);
 
     useEffect(() => {
-        const apiKey = (window as any).process?.env?.API_KEY || process.env.API_KEY;
+        // CORREÇÃO CRÍTICA: Tentar window.process.env primeiro
+        const apiKey = (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) 
+                        || process.env.API_KEY;
         
-        // CORREÇÃO: Removemos a validação que impedia chaves começando por 'AIzaSy'
         if (!apiKey) {
-             setMessages(p => [...p, { role: 'model', text: '⚠️ A API Key da IA não está configurada corretamente no ambiente (index.html). Por favor verifique o código.' }]);
+             setMessages(p => [...p, { role: 'model', text: '⚠️ A API Key da IA não foi encontrada. Se estiver a rodar localmente, verifique o ficheiro .env. Se for na produção, verifique o index.html.' }]);
              return;
         }
 
@@ -1535,7 +1536,7 @@ const AICoachView = () => {
         if(!input.trim()) return;
         
         if (!chatRef.current) {
-             setMessages(p => [...p, { role: 'model', text: '⚠️ Erro: O chat não conseguiu conectar-se à Google AI. Verifique a API Key.' }]);
+             setMessages(p => [...p, { role: 'model', text: '⚠️ Erro: O chat não conseguiu conectar-se à Google AI. Verifique se a API Key está válida.' }]);
              return;
         }
 

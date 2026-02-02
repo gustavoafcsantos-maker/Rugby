@@ -4,8 +4,16 @@ import { Player, Position, Match, TrainingSession } from '../types';
 const MODEL_NAME = 'gemini-3-flash-preview';
 
 // Helper seguro para obter a instância da IA
+// Procura explicitamente no window.process.env definido no index.html se process.env falhar
 const getAIClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) 
+                 || process.env.API_KEY;
+                 
+  if (!apiKey) {
+    console.error("API Key não encontrada!");
+    throw new Error("API Key em falta");
+  }
+  return new GoogleGenAI({ apiKey });
 };
 
 export const generateTrainingPlan = async (
@@ -39,7 +47,7 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico. Verifique se a API Key está configurada corretamente no index.html.";
+    return "Erro ao contactar o assistente técnico. Verifique a consola para mais detalhes sobre a API Key.";
   }
 };
 

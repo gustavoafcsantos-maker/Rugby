@@ -17,7 +17,7 @@
       
       // Lógica de fallback para garantir que a app não rebenta se esquecer de trocar
       if (!window.process.env.API_KEY) {
-        if (MINHA_CHAVE_GOOGLE !== "COLE_A_SUA_CHAVE_AQUI") {
+        if (MINHA_CHAVE_GOOGLE !== "AIzaSyBz6u0TkgCmDtqsF5zTu6iMhYpp-K0qFo8") {
             window.process.env.API_KEY = MINHA_CHAVE_GOOGLE;
         } else {
             // Chave de demonstração (pode falhar com erro 403 em produção)

@@ -6,14 +6,24 @@ const MODEL_NAME = 'gemini-3-flash-preview';
 // Helper seguro para obter a instância da IA
 // Procura explicitamente no window.process.env definido no index.html se process.env falhar
 const getAIClient = () => {
-  // Tenta várias fontes para a API Key
-  const apiKey = (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) 
-                 || process.env.API_KEY;
-                 
-  if (!apiKey) {
-    console.error("API Key não encontrada no ambiente!");
-    throw new Error("API Key em falta. Verifique o ficheiro index.html ou as variáveis de ambiente.");
+  // Tenta várias fontes para a API Key de forma robusta
+  let apiKey = '';
+  
+  // 1. Tenta window (Polyfill do index.html)
+  if (typeof window !== 'undefined' && (window as any).process && (window as any).process.env) {
+    apiKey = (window as any).process.env.API_KEY;
   }
+
+  // 2. Fallback para process normal (Build time)
+  if (!apiKey && typeof process !== 'undefined' && process.env) {
+    apiKey = process.env.API_KEY || '';
+  }
+
+  if (!apiKey || apiKey.includes("COLE_A_SUA_CHAVE")) {
+    console.error("API Key inválida ou não encontrada!");
+    throw new Error("API Key em falta. Verifique o ficheiro index.html.");
+  }
+
   return new GoogleGenAI({ apiKey });
 };
 
@@ -49,7 +59,10 @@ export const generateTrainingPlan = async (
   } catch (error: any) {
     console.error("Gemini Error:", error);
     if (error.toString().includes('403')) {
-      return "Erro 403: Acesso negado. Se estiver a usar um link publicado, verifique se a API Key permite este domínio na Google Cloud Console.";
+      return "Erro 403: Acesso negado. A API Key não permite este domínio. Adicione o URL do Vercel nas restrições da chave na Google Cloud Console.";
+    }
+    if (error.toString().includes('400')) {
+        return "Erro 400: Pedido inválido. Verifique se a API Key está correta no index.html.";
     }
     return "Erro ao contactar o assistente técnico. Verifique a consola para detalhes.";
   }

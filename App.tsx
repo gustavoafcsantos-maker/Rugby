@@ -1486,13 +1486,25 @@ const AICoachView = () => {
     const [loading, setLoading] = useState(false);
     const chatRef = useRef<any>(null);
 
+    // Initial message to prompt user
+    useEffect(() => {
+        if (messages.length === 0) {
+            setMessages([{role: 'model', text: 'Olá! Sou o teu adjunto virtual. Pergunta-me sobre exercícios de placagem, táticas de alinhamento ou gestão de fadiga.'}]);
+        }
+    }, []);
+
+    // Initialize Gemini Chat
     useEffect(() => {
         // CORREÇÃO CRÍTICA: Tentar window.process.env primeiro para garantir que lemos do index.html
-        const apiKey = (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) 
-                        || process.env.API_KEY;
+        let apiKey = '';
+        if (typeof window !== 'undefined' && (window as any).process && (window as any).process.env) {
+            apiKey = (window as any).process.env.API_KEY;
+        } else if (process.env.API_KEY) {
+            apiKey = process.env.API_KEY;
+        }
         
-        if (!apiKey) {
-             setMessages(p => [...p, { role: 'model', text: '⚠️ A API Key da IA não foi encontrada. Se estiver a rodar localmente, verifique o ficheiro .env. Se for na produção, verifique o index.html.' }]);
+        if (!apiKey || apiKey.includes("COLE_A_SUA_CHAVE")) {
+             setMessages(p => [...p, { role: 'model', text: '⚠️ A API Key da IA não foi encontrada ou é inválida. Verifique o ficheiro index.html.' }]);
              return;
         }
 
@@ -1527,7 +1539,7 @@ const AICoachView = () => {
             console.error(e);
             let errorMsg = 'Desculpe, não consigo responder neste momento.';
             if (e.toString().includes('403')) errorMsg = '⚠️ Erro 403: Acesso Negado. Se esta app estiver publicada, verifique se a API Key tem restrições de domínio (Referrer) na Google Cloud Console.';
-            if (e.toString().includes('400')) errorMsg = 'Erro 400: Pedido inválido.';
+            if (e.toString().includes('400')) errorMsg = 'Erro 400: Pedido inválido. A chave API pode estar incorreta.';
             setMessages(p => [...p, { role: 'model', text: errorMsg }]);
         }
         setLoading(false);
@@ -1542,12 +1554,6 @@ const AICoachView = () => {
                 </h3>
             </div>
             <div className="flex-1 overflow-y-auto space-y-4 p-4">
-                {messages.length === 0 && (
-                    <div className="text-center text-slate-400 mt-10">
-                        <IconBrain className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                        <p>Olá! Sou o teu adjunto virtual. <br/>Pergunta-me sobre exercícios de placagem, táticas de alinhamento ou gestão de fadiga.</p>
-                    </div>
-                )}
                 {messages.map((m, i) => (
                     <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] p-3 rounded-2xl ${m.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-800 rounded-tl-none'}`}>

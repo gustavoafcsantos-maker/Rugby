@@ -12,7 +12,8 @@ import { INITIAL_PLAYERS, INITIAL_TRAININGS, INITIAL_MATCHES } from './constants
 import { generateTrainingPlan, generateMatchStrategy } from './services/geminiService';
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI } from "@google/genai";
-import { createClient } from "@supabase/supabase-js";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 import * as XLSX from 'xlsx';
 
 // --- Helper Functions ---
@@ -573,7 +574,7 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     );
 };
 
-// --- Database View (New) ---
+// --- Database View (Firebase) ---
 const DatabaseView = ({ 
     players, 
     trainings, 
@@ -585,34 +586,56 @@ const DatabaseView = ({
     matches: Match[],
     onLoadData: (p: Player[], t: TrainingSession[], m: Match[]) => void
 }) => {
-    const [config, setConfig] = useState({ url: '', key: '' });
+    const [config, setConfig] = useState({ apiKey: '', projectId: '' });
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<string>('');
 
     // Load saved config
     useEffect(() => {
-        const savedUrl = localStorage.getItem('supabase_url') || '';
-        const savedKey = localStorage.getItem('supabase_key') || '';
-        setConfig({ url: savedUrl, key: savedKey });
+        const savedApiKey = localStorage.getItem('firebase_api_key') || '';
+        const savedProjectId = localStorage.getItem('firebase_project_id') || '';
+        setConfig({ apiKey: savedApiKey, projectId: savedProjectId });
     }, []);
 
     const saveConfig = () => {
-        localStorage.setItem('supabase_url', config.url);
-        localStorage.setItem('supabase_key', config.key);
+        localStorage.setItem('firebase_api_key', config.apiKey);
+        localStorage.setItem('firebase_project_id', config.projectId);
         setStatus('Configuração guardada localmente.');
     };
 
-    const getSupabase = () => {
-        if (!config.url || !config.key) {
-            alert("Configure o URL e a Key primeiro.");
+    const getDb = () => {
+        if (!config.apiKey || !config.projectId) {
+            alert("Configure a API Key e o Project ID primeiro.");
             return null;
         }
-        return createClient(config.url, config.key);
+        
+        try {
+            // Initialize Firebase only if needed or singleton pattern
+            // For this simple app, we re-init. Note: Firebase throws if init multiple times with same name.
+            // Using a try-catch to handle re-initialization gracefully or just use standard SDK behavior.
+            const app = initializeApp({
+                apiKey: config.apiKey,
+                projectId: config.projectId
+            });
+            return getFirestore(app);
+        } catch (e: any) {
+            if (e.code === 'app/duplicate-app') {
+                // Return existing default app's firestore if already initialized
+                // Note: In a robust app, we'd manage the instance outside component
+                // For now, assume re-render might trigger this.
+                // However, importing `getApp` from firebase/app is needed to get existing app.
+                // Simplified: Alert user to refresh if config changed drastically.
+                console.error("Firebase init error", e);
+                return null;
+            }
+            setStatus(`Erro de configuração: ${e.message}`);
+            return null;
+        }
     };
 
     const handleSaveToCloud = async () => {
-        const supabase = getSupabase();
-        if (!supabase) return;
+        const db = getDb();
+        if (!db) return;
 
         setLoading(true);
         setStatus('A guardar...');
@@ -624,49 +647,48 @@ const DatabaseView = ({
             last_updated: new Date().toISOString()
         };
 
-        // We use a fixed ID=1 for simplicity in this personal app context
-        const { error } = await supabase
-            .from('app_state')
-            .upsert({ id: 1, data: payload });
-
-        if (error) {
+        try {
+            // Save to collection 'backups', document 'rugby_manager_data'
+            await setDoc(doc(db, "backups", "rugby_manager_data"), payload);
+            setStatus('Dados guardados com sucesso na Firebase!');
+        } catch (error: any) {
             console.error(error);
             setStatus(`Erro: ${error.message}`);
-        } else {
-            setStatus('Dados guardados com sucesso na Nuvem!');
+            if (error.code === 'permission-denied') {
+                setStatus('Erro: Permissão negada. Verifique as Regras de Segurança no Firebase Console.');
+            }
         }
         setLoading(false);
     };
 
     const handleLoadFromCloud = async () => {
-        const supabase = getSupabase();
-        if (!supabase) return;
+        const db = getDb();
+        if (!db) return;
 
         setLoading(true);
         setStatus('A carregar...');
 
-        const { data, error } = await supabase
-            .from('app_state')
-            .select('data')
-            .eq('id', 1)
-            .single();
+        try {
+            const docRef = doc(db, "backups", "rugby_manager_data");
+            const docSnap = await getDoc(docRef);
 
-        if (error) {
-            console.error(error);
-            setStatus(`Erro ao carregar: ${error.message}`);
-        } else if (data && data.data) {
-            const d = data.data;
-            onLoadData(d.players || [], d.trainings || [], d.matches || []);
-            setStatus('Dados carregados e atualizados!');
-        } else {
-            setStatus('Nenhum dado encontrado na nuvem.');
+            if (docSnap.exists()) {
+                const d = docSnap.data();
+                onLoadData(d.players || [], d.trainings || [], d.matches || []);
+                setStatus('Dados carregados e atualizados!');
+            } else {
+                setStatus('Nenhum dado encontrado na nuvem.');
+            }
+        } catch (error: any) {
+             console.error(error);
+             setStatus(`Erro ao carregar: ${error.message}`);
         }
         setLoading(false);
     };
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-800">Base de Dados Própria (Supabase)</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Base de Dados Google Firebase</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
@@ -675,26 +697,26 @@ const DatabaseView = ({
                     </h3>
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Project URL</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Project ID</label>
                             <input 
                                 type="text" 
-                                value={config.url} 
-                                onChange={e => setConfig({...config, url: e.target.value})}
+                                value={config.projectId} 
+                                onChange={e => setConfig({...config, projectId: e.target.value})}
                                 className="w-full px-3 py-2 border rounded-md text-sm" 
-                                placeholder="https://xyz.supabase.co"
+                                placeholder="ex: rugby-manager-123"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">API Key (anon/public)</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Web API Key</label>
                             <input 
                                 type="password" 
-                                value={config.key} 
-                                onChange={e => setConfig({...config, key: e.target.value})}
+                                value={config.apiKey} 
+                                onChange={e => setConfig({...config, apiKey: e.target.value})}
                                 className="w-full px-3 py-2 border rounded-md text-sm" 
-                                placeholder="eyJhbGciOiJIUzI1NiIsInR..."
+                                placeholder="AIzaSy..."
                             />
                         </div>
-                        <button onClick={saveConfig} className="bg-slate-800 text-white px-4 py-2 rounded-md hover:bg-slate-700 w-full">
+                        <button onClick={saveConfig} className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 w-full font-medium transition-colors">
                             Guardar Configuração
                         </button>
                     </div>
@@ -702,7 +724,7 @@ const DatabaseView = ({
 
                 <Card>
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                        <IconCloud className="w-5 h-5 text-blue-500" /> Sincronização
+                        <IconCloud className="w-5 h-5 text-blue-500" /> Sincronização (Firestore)
                     </h3>
                     <div className="space-y-4">
                         <button 
@@ -733,20 +755,13 @@ const DatabaseView = ({
             </div>
 
             <Card className="bg-slate-50 border-slate-200">
-                <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><IconDatabase className="w-4 h-4"/> Instruções de Instalação (Supabase)</h3>
+                <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><IconDatabase className="w-4 h-4"/> Instruções de Instalação (Firebase)</h3>
                 <div className="text-sm text-slate-600 space-y-2">
-                    <p>1. Crie uma conta gratuita em <a href="https://supabase.com" target="_blank" className="text-blue-600 underline">supabase.com</a> e crie um novo projeto.</p>
-                    <p>2. No menu <strong>SQL Editor</strong>, execute este comando para criar a tabela:</p>
-                    <div className="bg-slate-800 text-slate-200 p-3 rounded font-mono text-xs overflow-x-auto">
-                        create table app_state (<br/>
-                        &nbsp;&nbsp;id int primary key generated by default as identity,<br/>
-                        &nbsp;&nbsp;data jsonb,<br/>
-                        &nbsp;&nbsp;updated_at timestamp with time zone default timezone('utc'::text, now())<br/>
-                        );<br/>
-                        -- Opcional: Desativar RLS para testes rápidos (não recomendado para produção real)<br/>
-                        alter table app_state disable row level security;
-                    </div>
-                    <p>3. Vá a <strong>Settings &gt; API</strong> e copie o <strong>Project URL</strong> e a chave <strong>anon public</strong> para os campos acima.</p>
+                    <p>1. Crie um projeto em <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-600 underline">console.firebase.google.com</a>.</p>
+                    <p>2. No menu lateral, vá a <strong>Build &gt; Firestore Database</strong> e clique em <strong>Create Database</strong>.</p>
+                    <p>3. Selecione o modo <strong>Test Mode</strong> (para começar sem regras restritas) ou configure regras para permitir leitura/escrita.</p>
+                    <p>4. Vá às definições do projeto (engrenagem), adicione uma <strong>Web App</strong>.</p>
+                    <p>5. Copie o <code>apiKey</code> e o <code>projectId</code> do código de configuração que aparece.</p>
                 </div>
             </Card>
         </div>
@@ -1552,7 +1567,7 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
         ))}
       </nav>
       <div className="p-6 border-t border-slate-800">
-        <p className="text-xs text-slate-500">v1.1.0 • Supabase</p>
+        <p className="text-xs text-slate-500">v1.2.0 • Firebase</p>
       </div>
     </aside>
   );

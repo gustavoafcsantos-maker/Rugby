@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { 
-  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDownload, IconDatabase, IconSettings, IconCloud, IconCopy, IconPaste, IconInfo, IconRefresh
+  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDatabase, IconCloud, IconDownload, IconSettings
 } from './components/Icons';
 import { 
   Player, Position, PlayerStatus, TrainingSession, Match, ViewState, AttendanceStatus, MatchSelectionStatus
@@ -12,9 +12,10 @@ import { INITIAL_PLAYERS, INITIAL_TRAININGS, INITIAL_MATCHES } from './constants
 import { generateTrainingPlan, generateMatchStrategy } from './services/geminiService';
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI } from "@google/genai";
+import { createClient } from "@supabase/supabase-js";
 import * as XLSX from 'xlsx';
 
-// --- Helper Functions for Persistence ---
+// --- Helper Functions ---
 const loadState = <T,>(key: string, fallback: T): T => {
   try {
     const saved = localStorage.getItem(key);
@@ -33,16 +34,6 @@ const saveState = <T,>(key: string, data: T) => {
     console.error(`Erro ao guardar ${key}:`, e);
   }
 };
-
-// --- Debounce Helper for Auto-Save ---
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-  return debouncedValue;
-}
 
 // --- Helper Components ---
 const StatusBadge = ({ status }: { status: PlayerStatus }) => {
@@ -82,7 +73,7 @@ const PlayerDetailsModal = ({
   const [formData, setFormData] = useState<Player>({ ...player });
   const [activeTab, setActiveTab] = useState<'details' | 'stats'>('details');
 
-  // --- Statistics Calculation ---
+  // Stats logic same as before...
   const playerTrainings = trainings.filter(t => t.attendance[player.id]);
   const totalTrainings = playerTrainings.length;
   const presentCount = playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.PRESENT).length;
@@ -582,235 +573,182 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     );
 };
 
-// --- Data Management View (RESTORED) ---
-const DataManagementView = ({ 
+// --- Database View (New) ---
+const DatabaseView = ({ 
     players, 
     trainings, 
-    matches, 
-    onSetCloudConfig,
-    cloudConfig,
-    onDisconnect
+    matches,
+    onLoadData 
 }: { 
     players: Player[], 
     trainings: TrainingSession[], 
     matches: Match[],
-    onSetCloudConfig: (config: { apiKey: string, binId: string }) => void,
-    cloudConfig: { apiKey: string, binId: string } | null,
-    onDisconnect: () => void
+    onLoadData: (p: Player[], t: TrainingSession[], m: Match[]) => void
 }) => {
-    const [jsonBinConfig, setJsonBinConfig] = useState({ 
-        apiKey: cloudConfig?.apiKey || '', 
-        binId: cloudConfig?.binId || '' 
-    });
-    
-    const [magicLink, setMagicLink] = useState('');
-    const [isCreatingBin, setIsCreatingBin] = useState(false);
+    const [config, setConfig] = useState({ url: '', key: '' });
+    const [loading, setLoading] = useState(false);
+    const [status, setStatus] = useState<string>('');
 
+    // Load saved config
     useEffect(() => {
-        if (jsonBinConfig.apiKey && jsonBinConfig.binId) {
-            const baseUrl = window.location.origin + window.location.pathname;
-            const params = new URLSearchParams();
-            params.set('binId', jsonBinConfig.binId);
-            params.set('apiKey', jsonBinConfig.apiKey);
-            setMagicLink(`${baseUrl}?${params.toString()}`);
-        } else {
-            setMagicLink('');
-        }
-    }, [jsonBinConfig]);
+        const savedUrl = localStorage.getItem('supabase_url') || '';
+        const savedKey = localStorage.getItem('supabase_key') || '';
+        setConfig({ url: savedUrl, key: savedKey });
+    }, []);
 
-    useEffect(() => {
-        if (cloudConfig) {
-            setJsonBinConfig(cloudConfig);
-        }
-    }, [cloudConfig]);
-
-    const handleSaveConfig = () => {
-        if (!jsonBinConfig.apiKey || !jsonBinConfig.binId) {
-            alert("Preencha ambos os campos.");
-            return;
-        }
-        onSetCloudConfig(jsonBinConfig);
+    const saveConfig = () => {
+        localStorage.setItem('supabase_url', config.url);
+        localStorage.setItem('supabase_key', config.key);
+        setStatus('Configuração guardada localmente.');
     };
 
-    const handleAutoCreateBin = async () => {
-        if (!jsonBinConfig.apiKey) {
-            alert("Por favor, cole a sua X-Master-Key primeiro.");
-            return;
+    const getSupabase = () => {
+        if (!config.url || !config.key) {
+            alert("Configure o URL e a Key primeiro.");
+            return null;
         }
+        return createClient(config.url, config.key);
+    };
+
+    const handleSaveToCloud = async () => {
+        const supabase = getSupabase();
+        if (!supabase) return;
+
+        setLoading(true);
+        setStatus('A guardar...');
         
-        setIsCreatingBin(true);
-        try {
-            const response = await fetch('https://api.jsonbin.io/v3/b', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Master-Key': jsonBinConfig.apiKey,
-                    'X-Bin-Name': 'RugbyManager_Data'
-                },
-                body: JSON.stringify({ 
-                    info: "Initial Rugby Manager Data",
-                    players: players, 
-                    created_at: new Date().toISOString()
-                })
-            });
+        const payload = {
+            players,
+            trainings,
+            matches,
+            last_updated: new Date().toISOString()
+        };
 
-            const data = await response.json();
-            
-            if (response.ok && data.metadata && data.metadata.id) {
-                setJsonBinConfig(prev => ({ ...prev, binId: data.metadata.id }));
-                alert("Bin criado com sucesso! O ID foi preenchido automaticamente. Clique em 'Ativar Sincronização'.");
-            } else {
-                console.error("Erro ao criar bin:", data);
-                alert("Erro ao criar Bin. Verifique se a sua Key está correta.\nErro: " + (data.message || 'Desconhecido'));
-            }
-        } catch (error) {
+        // We use a fixed ID=1 for simplicity in this personal app context
+        const { error } = await supabase
+            .from('app_state')
+            .upsert({ id: 1, data: payload });
+
+        if (error) {
             console.error(error);
-            alert("Erro de conexão ao JSONBin.io");
+            setStatus(`Erro: ${error.message}`);
+        } else {
+            setStatus('Dados guardados com sucesso na Nuvem!');
         }
-        setIsCreatingBin(false);
+        setLoading(false);
     };
 
-    const handleCopyLink = () => {
-        if (!magicLink) return;
-        navigator.clipboard.writeText(magicLink);
-        alert("Link copiado! Guarde-o ou envie para os seus outros dispositivos.");
+    const handleLoadFromCloud = async () => {
+        const supabase = getSupabase();
+        if (!supabase) return;
+
+        setLoading(true);
+        setStatus('A carregar...');
+
+        const { data, error } = await supabase
+            .from('app_state')
+            .select('data')
+            .eq('id', 1)
+            .single();
+
+        if (error) {
+            console.error(error);
+            setStatus(`Erro ao carregar: ${error.message}`);
+        } else if (data && data.data) {
+            const d = data.data;
+            onLoadData(d.players || [], d.trainings || [], d.matches || []);
+            setStatus('Dados carregados e atualizados!');
+        } else {
+            setStatus('Nenhum dado encontrado na nuvem.');
+        }
+        setLoading(false);
     };
 
     return (
-        <div className="space-y-8 pb-10">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-800">Sincronização Cloud</h2>
-                <p className="text-slate-500 mt-2">
-                    Ligue a sua conta gratuita JSONBin.io para ter os seus dados em qualquer lugar, automaticamente.
-                </p>
-            </div>
-
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-slate-800">Base de Dados Própria (Supabase)</h2>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* 1. Setup */}
-                <Card className={`border-l-4 ${cloudConfig ? 'border-green-500' : 'border-slate-300'}`}>
-                     <div className="flex items-start gap-4">
-                        <div className={`p-3 rounded-lg ${cloudConfig ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-600'}`}>
-                            <IconCloud className="w-6 h-6" />
+                <Card>
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                        <IconSettings className="w-5 h-5 text-slate-500" /> Configuração
+                    </h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Project URL</label>
+                            <input 
+                                type="text" 
+                                value={config.url} 
+                                onChange={e => setConfig({...config, url: e.target.value})}
+                                className="w-full px-3 py-2 border rounded-md text-sm" 
+                                placeholder="https://xyz.supabase.co"
+                            />
                         </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                                1. Configurar Cloud
-                                {cloudConfig && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">Ativo</span>}
-                            </h3>
-                            <p className="text-slate-600 text-sm mt-1 mb-4">
-                                Crie uma conta em <a href="https://jsonbin.io" target="_blank" className="text-blue-600 underline">jsonbin.io</a>, obtenha a sua API Key e cole-a aqui.
-                            </p>
-                            
-                            <div className="grid gap-4 mb-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">X-Master-Key (API Key)</label>
-                                    <input 
-                                        type="password" 
-                                        value={jsonBinConfig.apiKey}
-                                        onChange={e => setJsonBinConfig({...jsonBinConfig, apiKey: e.target.value})}
-                                        className="w-full px-3 py-2 border rounded-md text-sm"
-                                        placeholder="Ex: $2b$10$..."
-                                    />
-                                    <p className="text-[10px] text-slate-400 mt-1">Encontre em: Profile Avatar &gt; API Keys &gt; Create New</p>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Bin ID</label>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="text" 
-                                            value={jsonBinConfig.binId}
-                                            onChange={e => setJsonBinConfig({...jsonBinConfig, binId: e.target.value})}
-                                            className="w-full px-3 py-2 border rounded-md text-sm"
-                                            placeholder="Ex: 67ab..."
-                                        />
-                                        <button 
-                                            onClick={handleAutoCreateBin}
-                                            disabled={isCreatingBin || !jsonBinConfig.apiKey}
-                                            className="shrink-0 px-3 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
-                                            title="Cria um Bin vazio automaticamente usando a sua Key"
-                                        >
-                                            {isCreatingBin ? 'A criar...' : 'Gerar ID'}
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] text-slate-400 mt-1">Cole um ID existente ou clique em "Gerar ID" para criar um novo.</p>
-                                </div>
-                            </div>
-
-                            <button 
-                                onClick={handleSaveConfig}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full mb-2"
-                            >
-                                {cloudConfig ? 'Atualizar Configuração' : 'Ativar Sincronização'}
-                            </button>
-                            
-                            {cloudConfig && (
-                                <button 
-                                    onClick={onDisconnect}
-                                    className="border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full flex items-center justify-center gap-2"
-                                >
-                                    <IconX className="w-4 h-4" />
-                                    Desconectar / Resetar
-                                </button>
-                            )}
-
-                            <details className="mt-4 text-xs text-slate-500 cursor-pointer group">
-                                <summary className="flex items-center gap-1 font-medium hover:text-indigo-600 transition-colors">
-                                    <IconInfo className="w-3 h-3" />
-                                    Como fazer manualmente?
-                                </summary>
-                                <div className="mt-2 pl-2 border-l-2 border-slate-200 space-y-2 bg-slate-50 p-2 rounded-r-lg">
-                                    <p>1. Vá a <a href="https://jsonbin.io" target="_blank" className="text-indigo-600 underline">jsonbin.io</a> e faça login.</p>
-                                    <p>2. Clique em <strong>+ Create New</strong>.</p>
-                                    <p>3. <strong>IMPORTANTE:</strong> Escreva <code>{`{"dados": "inicio"}`}</code> no editor. O JSONBin proíbe Bins vazios.</p>
-                                    <p>4. Clique no ícone de disquete (Save). Copie o <strong>Bin ID</strong> do topo.</p>
-                                </div>
-                            </details>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">API Key (anon/public)</label>
+                            <input 
+                                type="password" 
+                                value={config.key} 
+                                onChange={e => setConfig({...config, key: e.target.value})}
+                                className="w-full px-3 py-2 border rounded-md text-sm" 
+                                placeholder="eyJhbGciOiJIUzI1NiIsInR..."
+                            />
                         </div>
+                        <button onClick={saveConfig} className="bg-slate-800 text-white px-4 py-2 rounded-md hover:bg-slate-700 w-full">
+                            Guardar Configuração
+                        </button>
                     </div>
                 </Card>
 
-                {/* 2. Magic Link */}
-                <Card className={`border-l-4 ${magicLink ? 'border-purple-500' : 'border-slate-200'}`}>
-                    <div className="flex items-start gap-4">
-                        <div className={`p-3 rounded-lg ${magicLink ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-400'}`}>
-                            <IconCopy className="w-6 h-6" />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-lg text-slate-800">2. Link de Acesso Universal</h3>
-                            <p className="text-slate-600 text-sm mt-1 mb-4">
-                                Este link contém as suas chaves. <strong>Guarde-o nos favoritos</strong>. 
-                                Sempre que abrir este link, os seus dados serão carregados automaticamente.
-                            </p>
-                            
-                            {magicLink ? (
-                                <>
-                                    <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-2 break-all text-xs font-mono text-slate-600">
-                                        {magicLink}
-                                    </div>
-                                    <p className="text-xs text-emerald-600 font-medium mb-4 flex items-center gap-1">
-                                        <IconCheck className="w-3 h-3" />
-                                        O link é permanente. Não muda ao editar dados.
-                                    </p>
-                                </>
-                            ) : (
-                                <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-4 text-xs font-mono text-slate-400 italic">
-                                    Preencha as chaves à esquerda para gerar o link...
-                                </div>
-                            )}
+                <Card>
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                        <IconCloud className="w-5 h-5 text-blue-500" /> Sincronização
+                    </h3>
+                    <div className="space-y-4">
+                        <button 
+                            onClick={handleSaveToCloud} 
+                            disabled={loading}
+                            className="flex items-center justify-center gap-2 w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                            <IconUpload className="w-5 h-5" />
+                            {loading ? 'A processar...' : 'Guardar na Nuvem (Backup)'}
+                        </button>
+                        
+                        <button 
+                            onClick={handleLoadFromCloud} 
+                            disabled={loading}
+                            className="flex items-center justify-center gap-2 w-full bg-white border-2 border-blue-600 text-blue-600 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
+                        >
+                            <IconDownload className="w-5 h-5" />
+                            {loading ? 'A processar...' : 'Carregar da Nuvem (Restore)'}
+                        </button>
 
-                            <button 
-                                onClick={handleCopyLink}
-                                disabled={!magicLink}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${magicLink ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
-                            >
-                                <IconCopy className="w-4 h-4" />
-                                Copiar Link Mágico
-                            </button>
-                        </div>
+                        {status && (
+                            <div className={`p-3 rounded text-sm text-center ${status.includes('Erro') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
+                                {status}
+                            </div>
+                        )}
                     </div>
                 </Card>
             </div>
+
+            <Card className="bg-slate-50 border-slate-200">
+                <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><IconDatabase className="w-4 h-4"/> Instruções de Instalação (Supabase)</h3>
+                <div className="text-sm text-slate-600 space-y-2">
+                    <p>1. Crie uma conta gratuita em <a href="https://supabase.com" target="_blank" className="text-blue-600 underline">supabase.com</a> e crie um novo projeto.</p>
+                    <p>2. No menu <strong>SQL Editor</strong>, execute este comando para criar a tabela:</p>
+                    <div className="bg-slate-800 text-slate-200 p-3 rounded font-mono text-xs overflow-x-auto">
+                        create table app_state (<br/>
+                        &nbsp;&nbsp;id int primary key generated by default as identity,<br/>
+                        &nbsp;&nbsp;data jsonb,<br/>
+                        &nbsp;&nbsp;updated_at timestamp with time zone default timezone('utc'::text, now())<br/>
+                        );<br/>
+                        -- Opcional: Desativar RLS para testes rápidos (não recomendado para produção real)<br/>
+                        alter table app_state disable row level security;
+                    </div>
+                    <p>3. Vá a <strong>Settings &gt; API</strong> e copie o <strong>Project URL</strong> e a chave <strong>anon public</strong> para os campos acima.</p>
+                </div>
+            </Card>
         </div>
     );
 };
@@ -840,6 +778,7 @@ const DashboardView = ({ players, trainings, matches }: { players: Player[], tra
       <div className="space-y-6 animate-fade-in">
         <h2 className="text-2xl font-bold text-slate-800">Painel de Controlo</h2>
         
+        {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="border-l-4 border-blue-500">
             <div className="flex items-center justify-between">
@@ -879,6 +818,7 @@ const DashboardView = ({ players, trainings, matches }: { players: Player[], tra
           </Card>
         </div>
 
+        {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <h3 className="text-lg font-semibold mb-4 text-slate-700">Presenças Recentes</h3>
@@ -1479,7 +1419,6 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
     );
 };
 
-// --- AICoachView Updated ---
 const AICoachView = () => {
     const [messages, setMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
     const [input, setInput] = useState('');
@@ -1589,7 +1528,7 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
     { id: 'TRAINING', label: 'Treinos', icon: IconCalendar },
     { id: 'MATCHES', label: 'Jogos', icon: IconTrophy },
     { id: 'AI_COACH', label: 'Assistente AI', icon: IconBrain },
-    { id: 'DATA', label: 'Nuvem & Links', icon: IconCloud },
+    { id: 'DATA', label: 'Base de Dados', icon: IconDatabase },
   ];
 
   return (
@@ -1613,7 +1552,7 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
         ))}
       </nav>
       <div className="p-6 border-t border-slate-800">
-        <p className="text-xs text-slate-500">v1.0.0 • Gemini 2.0</p>
+        <p className="text-xs text-slate-500">v1.1.0 • Supabase</p>
       </div>
     </aside>
   );
@@ -1621,131 +1560,18 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
 
 const App = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
-  const [cloudConfig, setCloudConfig] = useState<{apiKey: string, binId: string} | null>(() => {
-      // Load config from LocalStorage if available
-      const k = localStorage.getItem('jsonbin_api_key');
-      const b = localStorage.getItem('jsonbin_bin_id');
-      return k && b ? { apiKey: k, binId: b } : null;
-  });
   
   // --- STATE INITIALIZATION WITH PERSISTENCE ---
   const [players, setPlayers] = useState<Player[]>(() => loadState('rugby_manager_players', INITIAL_PLAYERS));
   const [trainings, setTrainings] = useState<TrainingSession[]>(() => loadState('rugby_manager_trainings', INITIAL_TRAININGS));
   const [matches, setMatches] = useState<Match[]>(() => loadState('rugby_manager_matches', INITIAL_MATCHES));
-  const [isSyncing, setIsSyncing] = useState(false);
 
-  // --- AUTO-LOAD FROM URL OR CLOUD ---
-  const loadFromCloud = useCallback(async (activeConfig = cloudConfig) => {
-      if (!activeConfig) return;
-      
-      setIsSyncing(true);
-      try {
-          console.log("A carregar dados da nuvem...");
-          const res = await fetch(`https://api.jsonbin.io/v3/b/${activeConfig.binId}/latest`, {
-              headers: { 'X-Master-Key': activeConfig.apiKey }
-          });
-          
-          if (res.status === 403 || res.status === 401) {
-              alert("Erro de Permissão (403): A sua API Key não tem acesso a este Bin ID.\n\nMotivo provável: Este Bin foi criado por outra conta ou a Key está incorreta.\n\nSolução: Vá ao separador 'Nuvem', clique em 'Desconectar' e crie um novo Bin.");
-              throw new Error("Permissão negada");
-          }
-
-          if (!res.ok) throw new Error("Falha na cloud");
-          const json = await res.json();
-          const data = json.record;
-          
-          // Simple strategy: Overwrite local if cloud exists
-          if (data.players) setPlayers(data.players);
-          if (data.trainings) setTrainings(data.trainings);
-          if (data.matches) setMatches(data.matches);
-          console.log("Dados sincronizados com sucesso!");
-      } catch (e) {
-          console.error("Erro ao sincronizar:", e);
-      } finally {
-          setIsSyncing(false);
-      }
-  }, [cloudConfig]);
-
-  useEffect(() => {
-      const initCloud = async () => {
-          // 1. Check URL Params (Priority)
-          const params = new URLSearchParams(window.location.search);
-          const urlBinId = params.get('binId');
-          const urlApiKey = params.get('apiKey');
-
-          if (urlBinId && urlApiKey) {
-              const newConfig = { apiKey: urlApiKey, binId: urlBinId };
-              setCloudConfig(newConfig);
-              // Persist locally too so it works on refresh without params
-              localStorage.setItem('jsonbin_api_key', urlApiKey);
-              localStorage.setItem('jsonbin_bin_id', urlBinId);
-              loadFromCloud(newConfig);
-          } else if (cloudConfig) {
-              loadFromCloud(cloudConfig);
-          }
-      };
-      initCloud();
-  }, []); // Run once on mount
-
-  // --- PERSISTENCE EFFECTS (LOCAL) ---
+  // --- PERSISTENCE EFFECTS ---
   useEffect(() => { saveState('rugby_manager_players', players); }, [players]);
   useEffect(() => { saveState('rugby_manager_trainings', trainings); }, [trainings]);
   useEffect(() => { saveState('rugby_manager_matches', matches); }, [matches]);
 
-  // --- AUTO-SAVE TO CLOUD (DEBOUNCED) ---
-  const debouncedPlayers = useDebounce(players, 2000);
-  const debouncedTrainings = useDebounce(trainings, 2000);
-  const debouncedMatches = useDebounce(matches, 2000);
-
-  useEffect(() => {
-      const syncToCloud = async () => {
-          if (!cloudConfig) return;
-          // Avoid auto-saving empty initial states over existing cloud data
-          if (debouncedPlayers.length === 0 && debouncedTrainings.length === 0 && debouncedMatches.length === 0) return;
-
-          try {
-              const data = { 
-                  players: debouncedPlayers, 
-                  trainings: debouncedTrainings, 
-                  matches: debouncedMatches, 
-                  version: "1.0", 
-                  timestamp: new Date().toISOString() 
-              };
-              const res = await fetch(`https://api.jsonbin.io/v3/b/${cloudConfig.binId}`, {
-                  method: 'PUT',
-                  headers: {
-                      'Content-Type': 'application/json',
-                      'X-Master-Key': cloudConfig.apiKey
-                  },
-                  body: JSON.stringify(data)
-              });
-              
-              if (res.status === 403) {
-                  console.error("Erro 403 no auto-save: Permissão negada");
-              }
-          } catch(e) {
-              console.error("Erro no auto-save:", e);
-          }
-      };
-      syncToCloud();
-  }, [debouncedPlayers, debouncedTrainings, debouncedMatches, cloudConfig]);
-
-
   // --- ACTIONS ---
-  const handleDisconnect = () => {
-      if (window.confirm("Tem a certeza? Isto irá desligar a sincronização. Certifique-se que tem a API Key guardada se quiser reconectar depois.")) {
-          localStorage.removeItem('jsonbin_api_key');
-          localStorage.removeItem('jsonbin_bin_id');
-          setCloudConfig(null);
-          // Opcional: Limpar URL params para não reconectar automaticamente no refresh
-          const url = new URL(window.location.href);
-          url.searchParams.delete('apiKey');
-          url.searchParams.delete('binId');
-          window.history.replaceState({}, '', url);
-          alert("Desconectado com sucesso.");
-      }
-  };
-
   const addPlayer = (p: Player) => setPlayers(prev => [...prev, p]);
   const removePlayer = (id: string) => setPlayers(prev => prev.filter(p => p.id !== id));
   const updatePlayer = (p: Player) => setPlayers(prev => prev.map(current => current.id === p.id ? p : current));
@@ -1756,53 +1582,34 @@ const App = () => {
   const addMatch = (m: Match) => setMatches(prev => [...prev, m]);
   const updateMatch = (m: Match) => setMatches(prev => prev.map(curr => curr.id === m.id ? m : curr));
 
+  const handleCloudLoad = (p: Player[], t: TrainingSession[], m: Match[]) => {
+      if (window.confirm("Isto irá substituir os dados locais pelos da nuvem. Continuar?")) {
+          setPlayers(p);
+          setTrainings(t);
+          setMatches(m);
+      }
+  };
+
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
       <Sidebar view={view} setView={setView} />
       <main className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto min-h-full">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                 <div className="md:hidden flex justify-between items-center bg-white p-4 rounded-lg shadow-sm w-full">
-                     <h1 className="font-bold text-slate-800">Rugby Manager</h1>
-                     <select 
-                        value={view} 
-                        onChange={(e) => setView(e.target.value as ViewState)}
-                        className="bg-slate-100 border-none rounded-md px-2 py-1 text-sm"
-                     >
-                         <option value="DASHBOARD">Dashboard</option>
-                         <option value="ROSTER">Plantel</option>
-                         <option value="TRAINING">Treinos</option>
-                         <option value="MATCHES">Jogos</option>
-                         <option value="AI_COACH">AI Coach</option>
-                         <option value="DATA">Cloud</option>
-                     </select>
-                 </div>
-                 
-                 {/* Cloud Status Indicator (Desktop) */}
-                 <div className="hidden md:flex items-center gap-4 ml-auto">
-                    {cloudConfig ? (
-                        <div className="flex items-center gap-3">
-                            <button 
-                                onClick={() => loadFromCloud()} 
-                                disabled={isSyncing}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-medium transition-all shadow-sm active:scale-95 disabled:opacity-50"
-                                title="Forçar atualização da Cloud"
-                            >
-                                <IconRefresh className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
-                                {isSyncing ? 'A Sincronizar...' : 'Sincronizar Agora'}
-                            </button>
-                            <span className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                                <IconCloud className="w-3 h-3" />
-                                Online
-                            </span>
-                        </div>
-                    ) : (
-                        <button onClick={() => setView('DATA')} className="flex items-center gap-2 px-3 py-1 bg-slate-200 text-slate-600 hover:bg-slate-300 rounded-full text-xs font-medium transition-colors">
-                            <IconCloud className="w-3 h-3" />
-                            Offline
-                        </button>
-                    )}
-                 </div>
+            {/* Mobile Header */}
+            <div className="md:hidden mb-4 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+                 <h1 className="font-bold text-slate-800">Rugby Manager</h1>
+                 <select 
+                    value={view} 
+                    onChange={(e) => setView(e.target.value as ViewState)}
+                    className="bg-slate-100 border-none rounded-md px-2 py-1 text-sm"
+                 >
+                     <option value="DASHBOARD">Dashboard</option>
+                     <option value="ROSTER">Plantel</option>
+                     <option value="TRAINING">Treinos</option>
+                     <option value="MATCHES">Jogos</option>
+                     <option value="AI_COACH">AI Coach</option>
+                     <option value="DATA">Base de Dados</option>
+                 </select>
             </div>
 
           {view === 'DASHBOARD' && <DashboardView players={players} trainings={trainings} matches={matches} />}
@@ -1810,21 +1617,7 @@ const App = () => {
           {view === 'TRAINING' && <TrainingView trainings={trainings} players={players} addTraining={addTraining} updateTraining={updateTraining} />}
           {view === 'MATCHES' && <MatchesView matches={matches} players={players} addMatch={addMatch} updateMatch={updateMatch} />}
           {view === 'AI_COACH' && <AICoachView />}
-          {view === 'DATA' && (
-            <DataManagementView 
-                players={players} 
-                trainings={trainings} 
-                matches={matches} 
-                cloudConfig={cloudConfig}
-                onSetCloudConfig={(cfg) => {
-                    setCloudConfig(cfg);
-                    localStorage.setItem('jsonbin_api_key', cfg.apiKey);
-                    localStorage.setItem('jsonbin_bin_id', cfg.binId);
-                    loadFromCloud(cfg);
-                }}
-                onDisconnect={handleDisconnect}
-            />
-          )}
+          {view === 'DATA' && <DatabaseView players={players} trainings={trainings} matches={matches} onLoadData={handleCloudLoad} />}
         </div>
       </main>
     </div>

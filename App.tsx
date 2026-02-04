@@ -1504,6 +1504,7 @@ const AICoachView = () => {
                 });
             } catch (e) {
                 console.error("Erro ao iniciar chat", e);
+                setMessages(p => [...p, { role: 'model', text: '⚠️ Erro ao inicializar a IA. Verifique a consola.' }]);
             }
         } else {
              setMessages([{ role: 'model', text: '⚠️ A chave da API não está configurada. Por favor, verifique o ficheiro index.html.' }]);
@@ -1518,6 +1519,22 @@ const AICoachView = () => {
         setLoading(true);
         
         if (!chatRef.current) {
+             // Tentar re-inicializar se falhou no load
+             let apiKey = '';
+             if (typeof window !== 'undefined' && (window as any).GEMINI_API_KEY) apiKey = (window as any).GEMINI_API_KEY;
+             
+             if (apiKey) {
+                 try {
+                    const ai = new GoogleGenAI({ apiKey });
+                    chatRef.current = ai.chats.create({ 
+                        model: 'gemini-3-flash-preview', 
+                        config: { systemInstruction: 'És um treinador de rugby experiente...' } 
+                    });
+                 } catch(e) { console.error(e); }
+             }
+        }
+
+        if (!chatRef.current) {
              setMessages(p => [...p, { role: 'model', text: '⚠️ Erro: API Key não configurada ou inválida.' }]);
              setLoading(false);
              return;
@@ -1526,8 +1543,12 @@ const AICoachView = () => {
         try {
             const res = await chatRef.current.sendMessage({ message: msg });
             setMessages(p => [...p, { role: 'model', text: res.text }]);
-        } catch(e) {
-            setMessages(p => [...p, { role: 'model', text: 'Desculpe, não consigo responder neste momento. Verifique a sua ligação ou a API Key.' }]);
+        } catch(e: any) {
+            console.error("Chat Error:", e);
+            let errorMsg = 'Desculpe, não consigo responder neste momento.';
+            if (e.message?.includes('API key')) errorMsg += ' (Erro de Chave API)';
+            if (e.message?.includes('fetch')) errorMsg += ' (Erro de Ligação)';
+            setMessages(p => [...p, { role: 'model', text: errorMsg }]);
         }
         setLoading(false);
     };

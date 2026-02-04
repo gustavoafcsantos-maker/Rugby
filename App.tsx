@@ -1546,8 +1546,8 @@ const AICoachView = () => {
         } catch(e: any) {
             console.error("Chat Error:", e);
             let errorMsg = 'Desculpe, não consigo responder neste momento.';
-            if (e.message?.includes('API key')) errorMsg += ' (Erro de Chave API)';
-            if (e.message?.includes('fetch')) errorMsg += ' (Erro de Ligação)';
+            if (e.message?.includes('API key') || e.status === 403) errorMsg += ' (A sua Chave API é inválida ou expirou)';
+            else if (e.message?.includes('fetch')) errorMsg += ' (Erro de Ligação)';
             setMessages(p => [...p, { role: 'model', text: errorMsg }]);
         }
         setLoading(false);

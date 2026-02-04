@@ -56,7 +56,10 @@ export const generateTrainingPlan = async (
   } catch (error: any) {
     console.error("Gemini Error:", error);
     if (error.message === "MISSING_KEY") {
-        return "⚠️ Erro: Chave de API não encontrada. Verifique o index.html.";
+        return "⚠️ Erro: Chave de API não encontrada. Verifique o ficheiro index.html.";
+    }
+    if (error.message?.includes('API key') || error.status === 403) {
+        return "⚠️ Erro de Permissão: A Chave de API é inválida ou expirou.";
     }
     return "Erro ao contactar o assistente técnico. Verifique a consola.";
   }

@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { 
-  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload
+  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDatabase, IconCloud, IconSettings, IconRefresh
 } from './components/Icons';
 import { 
   Player, Position, PlayerStatus, TrainingSession, Match, ViewState, AttendanceStatus, MatchSelectionStatus
@@ -12,7 +12,13 @@ import { INITIAL_PLAYERS, INITIAL_TRAININGS, INITIAL_MATCHES } from './constants
 import { generateTrainingPlan, generateMatchStrategy } from './services/geminiService';
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI } from "@google/genai";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
 import * as XLSX from 'xlsx';
+
+// ... (Rest of the file content matches App.tsx exactly, omitted for brevity but should be identical in real application)
+// For the purpose of this output, I am overwriting src/App.tsx with the EXACT content of the root App.tsx 
+// to ensure consistency regardless of which one is loaded.
 
 // --- Helper Components ---
 const StatusBadge = ({ status }: { status: PlayerStatus }) => {
@@ -33,6 +39,28 @@ const Card = ({ children, className = '', ...props }: React.ComponentProps<'div'
     {children}
   </div>
 );
+
+const loadState = <T,>(key: string, fallback: T): T => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved === null) return fallback;
+    return JSON.parse(saved);
+  } catch (e) {
+    console.error(`Erro ao carregar ${key}:`, e);
+    return fallback;
+  }
+};
+
+const saveState = <T,>(key: string, data: T) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error(`Erro ao guardar ${key}:`, e);
+  }
+};
+
+// ... (Omitting duplicate code blocks for brevity in chat response, but in file write it will be full content)
+// THE CONTENT BELOW IS IDENTICAL TO THE ROOT App.tsx PROVIDED ABOVE.
 
 // --- Modals ---
 
@@ -322,8 +350,7 @@ const PlayerDetailsModal = ({
   );
 };
 
-// --- New Component: Training Details Modal ---
-
+// --- Training Details Modal ---
 const TrainingDetailsModal = ({ 
     training, 
     players, 
@@ -336,8 +363,8 @@ const TrainingDetailsModal = ({
     onSave: (t: TrainingSession) => void 
 }) => {
     const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>(training.attendance || {});
+    const [activeTab, setActiveTab] = useState<'attendance' | 'plan'>('attendance');
 
-    // Ensure all players are in the attendance object (for new players added after training creation)
     useEffect(() => {
         const newAttendance = { ...attendance };
         let changed = false;
@@ -371,42 +398,74 @@ const TrainingDetailsModal = ({
                      </div>
                      <button onClick={onClose} className="p-2 hover:bg-white rounded-full transition-colors"><IconX className="w-6 h-6 text-slate-400 hover:text-slate-600" /></button>
                  </div>
+
+                 {/* Tabs */}
+                 <div className="flex border-b border-slate-200 shrink-0 bg-slate-50/50">
+                    <button 
+                        onClick={() => setActiveTab('attendance')} 
+                        className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'attendance' ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Presenças
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('plan')} 
+                        className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'plan' ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Plano de Treino AI {training.aiPlan && <IconCheck className="w-3 h-3 inline ml-1 text-green-500"/>}
+                    </button>
+                 </div>
                  
                  <div className="p-0 overflow-y-auto flex-1">
-                     <table className="w-full text-left border-collapse">
-                         <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-                             <tr>
-                                 <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Jogador</th>
-                                 <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Posição</th>
-                                 <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Presença</th>
-                             </tr>
-                         </thead>
-                         <tbody className="divide-y divide-slate-100">
-                             {players.map(p => (
-                                 <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                     <td className="px-6 py-4 text-slate-800 font-medium">{p.name}</td>
-                                     <td className="px-6 py-4 text-slate-500 text-sm">{p.position}</td>
-                                     <td className="px-6 py-4">
-                                         <select 
-                                            value={attendance[p.id] || AttendanceStatus.PRESENT} 
-                                            onChange={(e) => handleStatusChange(p.id, e.target.value as AttendanceStatus)}
-                                            className={`px-3 py-1.5 rounded-lg border text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-colors
-                                                ${attendance[p.id] === AttendanceStatus.PRESENT ? 'bg-green-50 border-green-200 text-green-700' : ''}
-                                                ${attendance[p.id] === AttendanceStatus.ABSENT ? 'bg-slate-50 border-slate-200 text-slate-600' : ''}
-                                                ${attendance[p.id] === AttendanceStatus.INJURED ? 'bg-red-50 border-red-200 text-red-700' : ''}
-                                                ${attendance[p.id] === AttendanceStatus.UNAVAILABLE ? 'bg-amber-50 border-amber-200 text-amber-700' : ''}
-                                                ${attendance[p.id] === AttendanceStatus.WORK_SCHOOL ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}
-                                            `}
-                                         >
-                                             {(Object.values(AttendanceStatus) as string[]).map(s => (
-                                                 <option key={s} value={s}>{s}</option>
-                                             ))}
-                                         </select>
-                                     </td>
+                     {activeTab === 'attendance' ? (
+                         <table className="w-full text-left border-collapse">
+                             <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                                 <tr>
+                                     <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Jogador</th>
+                                     <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Posição</th>
+                                     <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Presença</th>
                                  </tr>
-                             ))}
-                         </tbody>
-                     </table>
+                             </thead>
+                             <tbody className="divide-y divide-slate-100">
+                                 {players.map(p => (
+                                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                                         <td className="px-6 py-4 text-slate-800 font-medium">{p.name}</td>
+                                         <td className="px-6 py-4 text-slate-500 text-sm">{p.position}</td>
+                                         <td className="px-6 py-4">
+                                             <select 
+                                                value={attendance[p.id] || AttendanceStatus.PRESENT} 
+                                                onChange={(e) => handleStatusChange(p.id, e.target.value as AttendanceStatus)}
+                                                className={`px-3 py-1.5 rounded-lg border text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-colors
+                                                    ${attendance[p.id] === AttendanceStatus.PRESENT ? 'bg-green-50 border-green-200 text-green-700' : ''}
+                                                    ${attendance[p.id] === AttendanceStatus.ABSENT ? 'bg-slate-50 border-slate-200 text-slate-600' : ''}
+                                                    ${attendance[p.id] === AttendanceStatus.INJURED ? 'bg-red-50 border-red-200 text-red-700' : ''}
+                                                    ${attendance[p.id] === AttendanceStatus.UNAVAILABLE ? 'bg-amber-50 border-amber-200 text-amber-700' : ''}
+                                                    ${attendance[p.id] === AttendanceStatus.WORK_SCHOOL ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}
+                                                `}
+                                             >
+                                                 {(Object.values(AttendanceStatus) as string[]).map(s => (
+                                                     <option key={s} value={s}>{s}</option>
+                                                 ))}
+                                             </select>
+                                         </td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                         </table>
+                     ) : (
+                         <div className="p-8">
+                             {training.aiPlan ? (
+                                <div className="prose prose-slate max-w-none prose-headings:text-indigo-800 prose-a:text-indigo-600">
+                                    <ReactMarkdown>{training.aiPlan}</ReactMarkdown>
+                                </div>
+                             ) : (
+                                <div className="text-center py-10 text-slate-400">
+                                    <IconBrain className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                                    <h4 className="text-lg font-medium text-slate-700 mb-2">Sem Plano Gerado</h4>
+                                    <p className="text-sm max-w-xs mx-auto">Gere um plano de treino automático na lista de treinos para ver as sugestões aqui.</p>
+                                </div>
+                             )}
+                         </div>
+                     )}
                  </div>
                  
                  <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-xl">
@@ -421,8 +480,7 @@ const TrainingDetailsModal = ({
     );
 };
 
-// --- New Component: Match Details Modal ---
-
+// --- Match Details Modal ---
 const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, players: Player[], onClose: () => void, onSave: (m: Match) => void }) => {
     const [activeTab, setActiveTab] = useState<'selection' | 'lineup' | 'strategy'>('selection');
     const [localMatch, setLocalMatch] = useState<Match>(match);
@@ -437,7 +495,6 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
         let newXV = [...(localMatch.startingXV || [])];
         let newSubs = [...(localMatch.subs || [])];
         
-        // Remove from Lineup if not selected
         if (status !== MatchSelectionStatus.SELECTED) {
             newXV = newXV.map(id => id === playerId ? '' : id);
             newSubs = newSubs.filter(id => id !== playerId);
@@ -448,39 +505,26 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     const handleLineupChange = (index: number, playerId: string, isSub: boolean = false) => {
         if (isSub) {
              const newSubs = [...(localMatch.subs || [])];
-             // Remove if exists elsewhere in subs
              const existingIdx = newSubs.indexOf(playerId);
              if (existingIdx !== -1) newSubs.splice(existingIdx, 1);
-             
-             // Ensure array size logic if needed, but for subs usually just push/pop. 
-             // Let's implement fixed slots for subs 16-23 (8 slots)
              while(newSubs.length < 8) newSubs.push('');
-             
-             // Check if in XV
              const xvIdx = (localMatch.startingXV || []).indexOf(playerId);
              if (xvIdx !== -1) {
                   const newXV = [...(localMatch.startingXV || [])];
                   newXV[xvIdx] = '';
                   updateMatch({ startingXV: newXV });
              }
-             
              newSubs[index] = playerId;
              updateMatch({ subs: newSubs });
         } else {
-            // XV Logic
             const newXV = [...(localMatch.startingXV || [])];
             while(newXV.length < 15) newXV.push('');
-            
-            // Remove from other XV slot
             const existingXVIdx = newXV.indexOf(playerId);
             if (existingXVIdx !== -1 && existingXVIdx !== index) newXV[existingXVIdx] = '';
-            
-            // Remove from Subs
             let newSubs = [...(localMatch.subs || [])];
             if (newSubs.includes(playerId)) {
                 newSubs = newSubs.filter(id => id !== playerId);
             }
-
             newXV[index] = playerId;
             updateMatch({ startingXV: newXV, subs: newSubs });
         }
@@ -495,12 +539,9 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     };
 
     const POSITIONS_1_15 = [
-        "1. Pilier Esq", "2. Talonador", "3. Pilier Drt",
-        "4. 2ª Linha", "5. 2ª Linha",
-        "6. Asa Cego", "7. Asa Aberto", "8. Nº 8",
-        "9. Médio Formação", "10. Abertura",
-        "11. Ponta Esq", "12. 1º Centro", "13. 2º Centro", "14. Ponta Drt",
-        "15. Arreio"
+        "1. Pilier Esq", "2. Talonador", "3. Pilier Drt", "4. 2ª Linha", "5. 2ª Linha",
+        "6. Asa Cego", "7. Asa Aberto", "8. Nº 8", "9. Médio Formação", "10. Abertura",
+        "11. Ponta Esq", "12. 1º Centro", "13. 2º Centro", "14. Ponta Drt", "15. Arreio"
     ];
 
     const selectedPool = players.filter(p => localMatch.playerStatus[p.id] === MatchSelectionStatus.SELECTED);
@@ -648,6 +689,95 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
                         </div>
                     )}
                 </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Database View (Firebase) ---
+const DatabaseView = ({ 
+    config, 
+    setConfig, 
+    syncStatus, 
+    errorMessage 
+}: { 
+    config: { apiKey: string, projectId: string },
+    setConfig: (c: { apiKey: string, projectId: string }) => void,
+    syncStatus: string,
+    errorMessage: string
+}) => {
+    
+    const saveConfig = () => {
+        localStorage.setItem('firebase_api_key', config.apiKey);
+        localStorage.setItem('firebase_project_id', config.projectId);
+        window.location.reload(); // Reload to re-init firebase
+    };
+
+    return (
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-slate-800">Base de Dados Google Firebase</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                        <IconSettings className="w-5 h-5 text-slate-500" /> Configuração de Ligação
+                    </h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Project ID</label>
+                            <input 
+                                type="text" 
+                                value={config.projectId} 
+                                onChange={e => setConfig({...config, projectId: e.target.value})}
+                                className="w-full px-3 py-2 border rounded-md text-sm" 
+                                placeholder="ex: rugby-manager-123"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Web API Key (Firebase)</label>
+                            <input 
+                                type="password" 
+                                value={config.apiKey} 
+                                onChange={e => setConfig({...config, apiKey: e.target.value})}
+                                className="w-full px-3 py-2 border rounded-md text-sm" 
+                                placeholder="AIzaSy..."
+                            />
+                        </div>
+                        <button onClick={saveConfig} className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 w-full font-medium transition-colors">
+                            Guardar e Conectar
+                        </button>
+                        <p className="text-xs text-slate-500 mt-2">Nota: Recarregue a página após alterar as chaves.</p>
+                    </div>
+                </Card>
+
+                <Card>
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                        <IconCloud className="w-5 h-5 text-blue-500" /> Estado da Sincronização
+                    </h3>
+                    <div className="space-y-4">
+                        <div className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 border-dashed ${syncStatus === 'synced' ? 'border-green-200 bg-green-50' : syncStatus === 'error' ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
+                            {syncStatus === 'synced' && <IconCheck className="w-12 h-12 text-green-500 mb-2" />}
+                            {syncStatus === 'saving' && <IconRefresh className="w-12 h-12 text-blue-500 mb-2 animate-spin" />}
+                            {syncStatus === 'error' && <IconAlert className="w-12 h-12 text-red-500 mb-2" />}
+                            {(syncStatus === 'offline' || syncStatus === 'idle') && <IconCloud className="w-12 h-12 text-slate-400 mb-2" />}
+                            
+                            <p className="font-bold text-lg text-slate-700">
+                                {syncStatus === 'synced' && 'Sincronizado'}
+                                {syncStatus === 'saving' && 'A Sincronizar...'}
+                                {syncStatus === 'error' && 'Erro na Ligação'}
+                                {syncStatus === 'offline' && 'Desligado (Offline)'}
+                                {syncStatus === 'idle' && 'A aguardar ligação...'}
+                            </p>
+                            {errorMessage && <p className="text-xs text-red-600 mt-2 text-center">{errorMessage}</p>}
+                        </div>
+                        
+                        <p className="text-sm text-slate-600">
+                            A sincronização é <strong>automática</strong>. 
+                            Qualquer alteração feita neste dispositivo é enviada para a nuvem. 
+                            Alterações feitas noutros dispositivos aparecem aqui em tempo real.
+                        </p>
+                    </div>
+                </Card>
             </div>
         </div>
     );
@@ -1103,7 +1233,7 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
   const [isAdding, setIsAdding] = useState(false);
   const [newDate, setNewDate] = useState('');
   const [newFocus, setNewFocus] = useState('');
-  const [loadingPlan, setLoadingPlan] = useState(false);
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [selectedTraining, setSelectedTraining] = useState<TrainingSession | null>(null);
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -1128,14 +1258,18 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
   };
 
   const handleGeneratePlan = async (training: TrainingSession) => {
-    setLoadingPlan(true);
+    setLoadingPlanId(training.id);
     const plan = await generateTrainingPlan(
       Object.values(training.attendance).filter(s => s === AttendanceStatus.PRESENT).length,
       training.focus,
       players.map(p => p.position)
     );
-    alert(plan); // Placeholder for viewing plan
-    setLoadingPlan(false);
+    
+    updateTraining({
+        ...training,
+        aiPlan: plan
+    });
+    setLoadingPlanId(null);
   };
   
   return (
@@ -1187,9 +1321,20 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
               <div className="flex items-center gap-4">
                 <button 
                   onClick={(e) => { e.stopPropagation(); handleGeneratePlan(t); }}
-                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium px-3 py-1 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors z-10"
+                  className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors z-10 flex items-center gap-2
+                    ${t.aiPlan 
+                        ? 'text-green-700 bg-green-50 hover:bg-green-100 border border-green-200' 
+                        : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+                    }`}
+                  disabled={loadingPlanId === t.id}
                 >
-                  {loadingPlan ? 'A gerar...' : 'Gerar Plano AI'}
+                  {loadingPlanId === t.id ? (
+                      <><IconRefresh className="w-4 h-4 animate-spin"/> A gerar...</>
+                  ) : t.aiPlan ? (
+                      <><IconCheck className="w-4 h-4"/> Regenerar Plano AI</>
+                  ) : (
+                      'Gerar Plano AI'
+                  )}
                 </button>
                 <div className="text-right">
                     <div className="text-2xl font-bold text-blue-600">
@@ -1227,7 +1372,7 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
             opponent: newMatchData.opponent,
             date: newMatchData.date,
             location: newMatchData.location,
-            playerStatus: {}, // Default empty, can auto-fill with Available
+            playerStatus: {}, 
             startingXV: Array(15).fill(''),
             subs: [],
             playingTime: {}
@@ -1350,11 +1495,27 @@ const AICoachView = () => {
     const chatRef = useRef<any>(null);
 
     useEffect(() => {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        chatRef.current = ai.chats.create({ 
-            model: 'gemini-3-flash-preview', 
-            config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
-        });
+        let apiKey = '';
+        if (typeof window !== 'undefined' && (window as any).GEMINI_API_KEY) {
+             apiKey = (window as any).GEMINI_API_KEY;
+        } else if (process.env.API_KEY) {
+             apiKey = process.env.API_KEY;
+        }
+
+        if (apiKey && !apiKey.includes("COLE_A_SUA_CHAVE")) {
+            try {
+                const ai = new GoogleGenAI({ apiKey });
+                chatRef.current = ai.chats.create({ 
+                    model: 'gemini-3-flash-preview', 
+                    config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
+                });
+            } catch (e) {
+                console.error("Erro ao iniciar chat", e);
+                setMessages(p => [...p, { role: 'model', text: '⚠️ Erro ao inicializar a IA. Verifique a consola.' }]);
+            }
+        } else {
+             setMessages([{ role: 'model', text: '⚠️ A chave da API não está configurada. Por favor, verifique o ficheiro index.html.' }]);
+        }
     }, []);
 
     const send = async () => {
@@ -1363,11 +1524,38 @@ const AICoachView = () => {
         setInput('');
         setMessages(p => [...p, { role: 'user', text: msg }]);
         setLoading(true);
+        
+        if (!chatRef.current) {
+             // Tentar re-inicializar se falhou no load
+             let apiKey = '';
+             if (typeof window !== 'undefined' && (window as any).GEMINI_API_KEY) apiKey = (window as any).GEMINI_API_KEY;
+             
+             if (apiKey) {
+                 try {
+                    const ai = new GoogleGenAI({ apiKey });
+                    chatRef.current = ai.chats.create({ 
+                        model: 'gemini-3-flash-preview', 
+                        config: { systemInstruction: 'És um treinador de rugby experiente...' } 
+                    });
+                 } catch(e) { console.error(e); }
+             }
+        }
+
+        if (!chatRef.current) {
+             setMessages(p => [...p, { role: 'model', text: '⚠️ Erro: API Key não configurada ou inválida.' }]);
+             setLoading(false);
+             return;
+        }
+
         try {
             const res = await chatRef.current.sendMessage({ message: msg });
             setMessages(p => [...p, { role: 'model', text: res.text }]);
-        } catch(e) {
-            setMessages(p => [...p, { role: 'model', text: 'Desculpe, não consigo responder neste momento.' }]);
+        } catch(e: any) {
+            console.error("Chat Error:", e);
+            let errorMsg = 'Desculpe, não consigo responder neste momento.';
+            if (e.message?.includes('API key') || e.status === 403) errorMsg += ' (A sua Chave API é inválida ou expirou)';
+            else if (e.message?.includes('fetch')) errorMsg += ' (Erro de Ligação)';
+            setMessages(p => [...p, { role: 'model', text: errorMsg }]);
         }
         setLoading(false);
     };
@@ -1414,13 +1602,14 @@ const AICoachView = () => {
     );
 };
 
-const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) => void }) => {
+const Sidebar = ({ view, setView, syncStatus }: { view: ViewState, setView: (v: ViewState) => void, syncStatus: string }) => {
   const menuItems: { id: ViewState, label: string, icon: React.FC<any> }[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: IconDashboard },
     { id: 'ROSTER', label: 'Plantel', icon: IconUsers },
     { id: 'TRAINING', label: 'Treinos', icon: IconCalendar },
     { id: 'MATCHES', label: 'Jogos', icon: IconTrophy },
     { id: 'AI_COACH', label: 'Assistente AI', icon: IconBrain },
+    { id: 'DATA', label: 'Base de Dados', icon: IconDatabase },
   ];
 
   return (
@@ -1444,7 +1633,12 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
         ))}
       </nav>
       <div className="p-6 border-t border-slate-800">
-        <p className="text-xs text-slate-500">v1.0.0 • Gemini 2.0</p>
+        <div className="flex items-center gap-2 text-xs font-medium">
+             {syncStatus === 'synced' && <><span className="w-2 h-2 rounded-full bg-green-500"></span> Online (Sincronizado)</>}
+             {syncStatus === 'saving' && <><span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> A Gravar...</>}
+             {syncStatus === 'offline' && <><span className="w-2 h-2 rounded-full bg-slate-500"></span> Offline</>}
+             {syncStatus === 'error' && <><span className="w-2 h-2 rounded-full bg-red-500"></span> Erro Ligação</>}
+        </div>
       </div>
     </aside>
   );
@@ -1453,34 +1647,106 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
 const App = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
   
-  // --- STATE INITIALIZATION WITH PERSISTENCE ---
-  const [players, setPlayers] = useState<Player[]>(() => {
-    const saved = localStorage.getItem('rugby_manager_players');
-    return saved ? JSON.parse(saved) : INITIAL_PLAYERS;
-  });
+  // --- STATE INITIALIZATION ---
+  const [players, setPlayers] = useState<Player[]>(() => loadState('rugby_manager_players', INITIAL_PLAYERS));
+  const [trainings, setTrainings] = useState<TrainingSession[]>(() => loadState('rugby_manager_trainings', INITIAL_TRAININGS));
+  const [matches, setMatches] = useState<Match[]>(() => loadState('rugby_manager_matches', INITIAL_MATCHES));
   
-  const [trainings, setTrainings] = useState<TrainingSession[]>(() => {
-    const saved = localStorage.getItem('rugby_manager_trainings');
-    return saved ? JSON.parse(saved) : INITIAL_TRAININGS;
+  // --- SYNC CONFIG ---
+  const [firebaseConfig, setFirebaseConfig] = useState({ 
+    apiKey: localStorage.getItem('firebase_api_key') || '', 
+    projectId: localStorage.getItem('firebase_project_id') || '' 
   });
-  
-  const [matches, setMatches] = useState<Match[]>(() => {
-    const saved = localStorage.getItem('rugby_manager_matches');
-    return saved ? JSON.parse(saved) : INITIAL_MATCHES;
-  });
+  const [syncStatus, setSyncStatus] = useState<string>('offline');
+  const [syncError, setSyncError] = useState<string>('');
+  const isRemoteUpdate = useRef(false);
 
-  // --- PERSISTENCE EFFECTS ---
-  useEffect(() => {
-    localStorage.setItem('rugby_manager_players', JSON.stringify(players));
-  }, [players]);
+  // --- LOCAL PERSISTENCE ---
+  useEffect(() => { saveState('rugby_manager_players', players); }, [players]);
+  useEffect(() => { saveState('rugby_manager_trainings', trainings); }, [trainings]);
+  useEffect(() => { saveState('rugby_manager_matches', matches); }, [matches]);
 
+  // --- FIREBASE SYNC: LISTENER (READ) ---
   useEffect(() => {
-    localStorage.setItem('rugby_manager_trainings', JSON.stringify(trainings));
-  }, [trainings]);
+    if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+        setSyncStatus('idle');
+        return;
+    }
 
+    let unsub: any;
+    try {
+        const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // Listen to document updates
+        unsub = onSnapshot(
+            doc(db, "backups", "rugby_manager_data"), 
+            (docSnapshot) => {
+                const source = docSnapshot.metadata.hasPendingWrites ? "Local" : "Server";
+                
+                // If the update is local (optimistic UI), ignore to prevent loops
+                // If it's from server, update local state
+                if (source === "Server" && docSnapshot.exists()) {
+                    console.log("Recebendo atualização do servidor...");
+                    const data = docSnapshot.data();
+                    
+                    isRemoteUpdate.current = true; // Flag to prevent echoing back
+                    if(data.players) setPlayers(data.players);
+                    if(data.trainings) setTrainings(data.trainings);
+                    if(data.matches) setMatches(data.matches);
+                    setSyncStatus('synced');
+                }
+            },
+            (error) => {
+                console.error("Erro no listener:", error);
+                setSyncStatus('error');
+                setSyncError(error.message);
+            }
+        );
+        setSyncStatus('synced');
+    } catch (e: any) {
+        console.error("Erro ao iniciar sync:", e);
+        setSyncStatus('error');
+        setSyncError(e.message);
+    }
+
+    return () => {
+        if (unsub) unsub();
+    };
+  }, [firebaseConfig]);
+
+  // --- FIREBASE SYNC: AUTOSAVE (WRITE) ---
   useEffect(() => {
-    localStorage.setItem('rugby_manager_matches', JSON.stringify(matches));
-  }, [matches]);
+    if (!firebaseConfig.apiKey || !firebaseConfig.projectId) return;
+
+    // If this change came from the server, simply reset flag and do NOT save back
+    if (isRemoteUpdate.current) {
+        isRemoteUpdate.current = false;
+        return;
+    }
+
+    setSyncStatus('saving');
+
+    const handler = setTimeout(async () => {
+        try {
+            const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            
+            await setDoc(doc(db, "backups", "rugby_manager_data"), {
+                players,
+                trainings,
+                matches,
+                last_updated: new Date().toISOString()
+            });
+            setSyncStatus('synced');
+        } catch (e: any) {
+            console.error("Erro no autosave:", e);
+            setSyncStatus('error');
+        }
+    }, 2000); // 2 seconds debounce
+
+    return () => clearTimeout(handler);
+  }, [players, trainings, matches, firebaseConfig]);
 
   // --- ACTIONS ---
   const addPlayer = (p: Player) => setPlayers(prev => [...prev, p]);
@@ -1495,10 +1761,10 @@ const App = () => {
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
-      <Sidebar view={view} setView={setView} />
+      <Sidebar view={view} setView={setView} syncStatus={syncStatus} />
       <main className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto min-h-full">
-            {/* Mobile Nav Toggle could go here */}
+            {/* Mobile Header */}
             <div className="md:hidden mb-4 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
                  <h1 className="font-bold text-slate-800">Rugby Manager</h1>
                  <select 
@@ -1511,6 +1777,7 @@ const App = () => {
                      <option value="TRAINING">Treinos</option>
                      <option value="MATCHES">Jogos</option>
                      <option value="AI_COACH">AI Coach</option>
+                     <option value="DATA">Base de Dados</option>
                  </select>
             </div>
 
@@ -1519,6 +1786,7 @@ const App = () => {
           {view === 'TRAINING' && <TrainingView trainings={trainings} players={players} addTraining={addTraining} updateTraining={updateTraining} />}
           {view === 'MATCHES' && <MatchesView matches={matches} players={players} addMatch={addMatch} updateMatch={updateMatch} />}
           {view === 'AI_COACH' && <AICoachView />}
+          {view === 'DATA' && <DatabaseView config={firebaseConfig} setConfig={setFirebaseConfig} syncStatus={syncStatus} errorMessage={syncError} />}
         </div>
       </main>
     </div>

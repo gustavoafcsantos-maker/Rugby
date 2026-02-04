@@ -1343,8 +1343,12 @@ const AICoachView = () => {
             apiKey = process.env.API_KEY;
         }
         
+        // Verifica se a chave é válida ou se ainda é o placeholder
         if (!apiKey || apiKey.includes("COLE_A_SUA_CHAVE")) {
-             setMessages(p => [...p, { role: 'model', text: '⚠️ A API Key da IA não foi encontrada ou é inválida. Verifique o ficheiro index.html.' }]);
+             setMessages(p => [
+                { role: 'model', text: '🔒 **Configuração em Falta**\n\nO Assistente AI precisa de uma chave válida para funcionar.\n\n**Como resolver:**\n1. Obtenha uma chave em [aistudio.google.com](https://aistudio.google.com)\n2. Abra o ficheiro `index.html` neste projeto.\n3. Cole a chave na variável `MINHA_CHAVE_GOOGLE`.\n4. Recarregue a página.' }
+             ]);
+             setLoading(true); // Bloqueia o input para evitar erros
              return;
         }
 
@@ -1364,7 +1368,7 @@ const AICoachView = () => {
         if(!input.trim()) return;
         
         if (!chatRef.current) {
-             setMessages(p => [...p, { role: 'model', text: '⚠️ Erro: O chat não conseguiu conectar-se à Google AI. Verifique se a API Key está válida.' }]);
+             setMessages(p => [...p, { role: 'model', text: '⚠️ A IA não está ativa. Verifique se configurou a API Key no ficheiro `index.html` e recarregue a página.' }]);
              return;
         }
 
@@ -1410,11 +1414,11 @@ const AICoachView = () => {
                     value={input} 
                     onChange={e => setInput(e.target.value)} 
                     onKeyDown={e => e.key === 'Enter' && send()}
-                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
                     placeholder="Escreve uma mensagem..."
                     disabled={loading}
                 />
-                <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled={loading}>
+                <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
                     Enviar
                 </button>
             </div>

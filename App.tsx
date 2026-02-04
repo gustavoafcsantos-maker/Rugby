@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { 
-  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDatabase, IconCloud, IconDownload, IconSettings
+  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDatabase, IconCloud, IconDownload, IconSettings, IconRefresh
 } from './components/Icons';
 import { 
   Player, Position, PlayerStatus, TrainingSession, Match, ViewState, AttendanceStatus, MatchSelectionStatus
@@ -12,8 +12,8 @@ import { INITIAL_PLAYERS, INITIAL_TRAININGS, INITIAL_MATCHES } from './constants
 import { generateTrainingPlan, generateMatchStrategy } from './services/geminiService';
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI } from "@google/genai";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
 import * as XLSX from 'xlsx';
 
 // --- Helper Functions ---
@@ -378,30 +378,24 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
              const newSubs = [...(localMatch.subs || [])];
              const existingIdx = newSubs.indexOf(playerId);
              if (existingIdx !== -1) newSubs.splice(existingIdx, 1);
-             
              while(newSubs.length < 8) newSubs.push('');
-             
              const xvIdx = (localMatch.startingXV || []).indexOf(playerId);
              if (xvIdx !== -1) {
                   const newXV = [...(localMatch.startingXV || [])];
                   newXV[xvIdx] = '';
                   updateMatch({ startingXV: newXV });
              }
-             
              newSubs[index] = playerId;
              updateMatch({ subs: newSubs });
         } else {
             const newXV = [...(localMatch.startingXV || [])];
             while(newXV.length < 15) newXV.push('');
-            
             const existingXVIdx = newXV.indexOf(playerId);
             if (existingXVIdx !== -1 && existingXVIdx !== index) newXV[existingXVIdx] = '';
-            
             let newSubs = [...(localMatch.subs || [])];
             if (newSubs.includes(playerId)) {
                 newSubs = newSubs.filter(id => id !== playerId);
             }
-
             newXV[index] = playerId;
             updateMatch({ startingXV: newXV, subs: newSubs });
         }
@@ -416,12 +410,9 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     };
 
     const POSITIONS_1_15 = [
-        "1. Pilier Esq", "2. Talonador", "3. Pilier Drt",
-        "4. 2ª Linha", "5. 2ª Linha",
-        "6. Asa Cego", "7. Asa Aberto", "8. Nº 8",
-        "9. Médio Formação", "10. Abertura",
-        "11. Ponta Esq", "12. 1º Centro", "13. 2º Centro", "14. Ponta Drt",
-        "15. Arreio"
+        "1. Pilier Esq", "2. Talonador", "3. Pilier Drt", "4. 2ª Linha", "5. 2ª Linha",
+        "6. Asa Cego", "7. Asa Aberto", "8. Nº 8", "9. Médio Formação", "10. Abertura",
+        "11. Ponta Esq", "12. 1º Centro", "13. 2º Centro", "14. Ponta Drt", "15. Arreio"
     ];
 
     const selectedPool = players.filter(p => localMatch.playerStatus[p.id] === MatchSelectionStatus.SELECTED);
@@ -576,114 +567,21 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
 
 // --- Database View (Firebase) ---
 const DatabaseView = ({ 
-    players, 
-    trainings, 
-    matches,
-    onLoadData 
+    config, 
+    setConfig, 
+    syncStatus, 
+    errorMessage 
 }: { 
-    players: Player[], 
-    trainings: TrainingSession[], 
-    matches: Match[],
-    onLoadData: (p: Player[], t: TrainingSession[], m: Match[]) => void
+    config: { apiKey: string, projectId: string },
+    setConfig: (c: { apiKey: string, projectId: string }) => void,
+    syncStatus: string,
+    errorMessage: string
 }) => {
-    const [config, setConfig] = useState({ apiKey: '', projectId: '' });
-    const [loading, setLoading] = useState(false);
-    const [status, setStatus] = useState<string>('');
-
-    // Load saved config
-    useEffect(() => {
-        const savedApiKey = localStorage.getItem('firebase_api_key') || '';
-        const savedProjectId = localStorage.getItem('firebase_project_id') || '';
-        setConfig({ apiKey: savedApiKey, projectId: savedProjectId });
-    }, []);
-
+    
     const saveConfig = () => {
         localStorage.setItem('firebase_api_key', config.apiKey);
         localStorage.setItem('firebase_project_id', config.projectId);
-        setStatus('Configuração guardada localmente.');
-    };
-
-    const getDb = () => {
-        if (!config.apiKey || !config.projectId) {
-            alert("Configure a API Key e o Project ID primeiro.");
-            return null;
-        }
-        
-        try {
-            // Initialize Firebase only if needed or singleton pattern
-            // For this simple app, we re-init. Note: Firebase throws if init multiple times with same name.
-            // Using a try-catch to handle re-initialization gracefully or just use standard SDK behavior.
-            const app = initializeApp({
-                apiKey: config.apiKey,
-                projectId: config.projectId
-            });
-            return getFirestore(app);
-        } catch (e: any) {
-            if (e.code === 'app/duplicate-app') {
-                // Return existing default app's firestore if already initialized
-                // Note: In a robust app, we'd manage the instance outside component
-                // For now, assume re-render might trigger this.
-                // However, importing `getApp` from firebase/app is needed to get existing app.
-                // Simplified: Alert user to refresh if config changed drastically.
-                console.error("Firebase init error", e);
-                return null;
-            }
-            setStatus(`Erro de configuração: ${e.message}`);
-            return null;
-        }
-    };
-
-    const handleSaveToCloud = async () => {
-        const db = getDb();
-        if (!db) return;
-
-        setLoading(true);
-        setStatus('A guardar...');
-        
-        const payload = {
-            players,
-            trainings,
-            matches,
-            last_updated: new Date().toISOString()
-        };
-
-        try {
-            // Save to collection 'backups', document 'rugby_manager_data'
-            await setDoc(doc(db, "backups", "rugby_manager_data"), payload);
-            setStatus('Dados guardados com sucesso na Firebase!');
-        } catch (error: any) {
-            console.error(error);
-            setStatus(`Erro: ${error.message}`);
-            if (error.code === 'permission-denied') {
-                setStatus('Erro: Permissão negada. Verifique as Regras de Segurança no Firebase Console.');
-            }
-        }
-        setLoading(false);
-    };
-
-    const handleLoadFromCloud = async () => {
-        const db = getDb();
-        if (!db) return;
-
-        setLoading(true);
-        setStatus('A carregar...');
-
-        try {
-            const docRef = doc(db, "backups", "rugby_manager_data");
-            const docSnap = await getDoc(docRef);
-
-            if (docSnap.exists()) {
-                const d = docSnap.data();
-                onLoadData(d.players || [], d.trainings || [], d.matches || []);
-                setStatus('Dados carregados e atualizados!');
-            } else {
-                setStatus('Nenhum dado encontrado na nuvem.');
-            }
-        } catch (error: any) {
-             console.error(error);
-             setStatus(`Erro ao carregar: ${error.message}`);
-        }
-        setLoading(false);
+        window.location.reload(); // Reload to re-init firebase
     };
 
     return (
@@ -693,7 +591,7 @@ const DatabaseView = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                        <IconSettings className="w-5 h-5 text-slate-500" /> Configuração
+                        <IconSettings className="w-5 h-5 text-slate-500" /> Configuração de Ligação
                     </h3>
                     <div className="space-y-4">
                         <div>
@@ -717,53 +615,41 @@ const DatabaseView = ({
                             />
                         </div>
                         <button onClick={saveConfig} className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 w-full font-medium transition-colors">
-                            Guardar Configuração
+                            Guardar e Conectar
                         </button>
+                        <p className="text-xs text-slate-500 mt-2">Nota: Recarregue a página após alterar as chaves.</p>
                     </div>
                 </Card>
 
                 <Card>
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                        <IconCloud className="w-5 h-5 text-blue-500" /> Sincronização (Firestore)
+                        <IconCloud className="w-5 h-5 text-blue-500" /> Estado da Sincronização
                     </h3>
                     <div className="space-y-4">
-                        <button 
-                            onClick={handleSaveToCloud} 
-                            disabled={loading}
-                            className="flex items-center justify-center gap-2 w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                        >
-                            <IconUpload className="w-5 h-5" />
-                            {loading ? 'A processar...' : 'Guardar na Nuvem (Backup)'}
-                        </button>
+                        <div className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 border-dashed ${syncStatus === 'synced' ? 'border-green-200 bg-green-50' : syncStatus === 'error' ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
+                            {syncStatus === 'synced' && <IconCheck className="w-12 h-12 text-green-500 mb-2" />}
+                            {syncStatus === 'saving' && <IconRefresh className="w-12 h-12 text-blue-500 mb-2 animate-spin" />}
+                            {syncStatus === 'error' && <IconAlert className="w-12 h-12 text-red-500 mb-2" />}
+                            {(syncStatus === 'offline' || syncStatus === 'idle') && <IconCloud className="w-12 h-12 text-slate-400 mb-2" />}
+                            
+                            <p className="font-bold text-lg text-slate-700">
+                                {syncStatus === 'synced' && 'Sincronizado'}
+                                {syncStatus === 'saving' && 'A Sincronizar...'}
+                                {syncStatus === 'error' && 'Erro na Ligação'}
+                                {syncStatus === 'offline' && 'Desligado (Offline)'}
+                                {syncStatus === 'idle' && 'A aguardar ligação...'}
+                            </p>
+                            {errorMessage && <p className="text-xs text-red-600 mt-2 text-center">{errorMessage}</p>}
+                        </div>
                         
-                        <button 
-                            onClick={handleLoadFromCloud} 
-                            disabled={loading}
-                            className="flex items-center justify-center gap-2 w-full bg-white border-2 border-blue-600 text-blue-600 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
-                        >
-                            <IconDownload className="w-5 h-5" />
-                            {loading ? 'A processar...' : 'Carregar da Nuvem (Restore)'}
-                        </button>
-
-                        {status && (
-                            <div className={`p-3 rounded text-sm text-center ${status.includes('Erro') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
-                                {status}
-                            </div>
-                        )}
+                        <p className="text-sm text-slate-600">
+                            A sincronização é <strong>automática</strong>. 
+                            Qualquer alteração feita neste dispositivo é enviada para a nuvem. 
+                            Alterações feitas noutros dispositivos aparecem aqui em tempo real.
+                        </p>
                     </div>
                 </Card>
             </div>
-
-            <Card className="bg-slate-50 border-slate-200">
-                <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><IconDatabase className="w-4 h-4"/> Instruções de Instalação (Firebase)</h3>
-                <div className="text-sm text-slate-600 space-y-2">
-                    <p>1. Crie um projeto em <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-600 underline">console.firebase.google.com</a>.</p>
-                    <p>2. No menu lateral, vá a <strong>Build &gt; Firestore Database</strong> e clique em <strong>Create Database</strong>.</p>
-                    <p>3. Selecione o modo <strong>Test Mode</strong> (para começar sem regras restritas) ou configure regras para permitir leitura/escrita.</p>
-                    <p>4. Vá às definições do projeto (engrenagem), adicione uma <strong>Web App</strong>.</p>
-                    <p>5. Copie o <code>apiKey</code> e o <code>projectId</code> do código de configuração que aparece.</p>
-                </div>
-            </Card>
         </div>
     );
 };
@@ -1536,7 +1422,7 @@ const AICoachView = () => {
     );
 };
 
-const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) => void }) => {
+const Sidebar = ({ view, setView, syncStatus }: { view: ViewState, setView: (v: ViewState) => void, syncStatus: string }) => {
   const menuItems: { id: ViewState, label: string, icon: React.FC<any> }[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: IconDashboard },
     { id: 'ROSTER', label: 'Plantel', icon: IconUsers },
@@ -1567,7 +1453,12 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
         ))}
       </nav>
       <div className="p-6 border-t border-slate-800">
-        <p className="text-xs text-slate-500">v1.2.0 • Firebase</p>
+        <div className="flex items-center gap-2 text-xs font-medium">
+             {syncStatus === 'synced' && <><span className="w-2 h-2 rounded-full bg-green-500"></span> Online (Sincronizado)</>}
+             {syncStatus === 'saving' && <><span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> A Gravar...</>}
+             {syncStatus === 'offline' && <><span className="w-2 h-2 rounded-full bg-slate-500"></span> Offline</>}
+             {syncStatus === 'error' && <><span className="w-2 h-2 rounded-full bg-red-500"></span> Erro Ligação</>}
+        </div>
       </div>
     </aside>
   );
@@ -1576,15 +1467,106 @@ const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) =
 const App = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
   
-  // --- STATE INITIALIZATION WITH PERSISTENCE ---
+  // --- STATE INITIALIZATION ---
   const [players, setPlayers] = useState<Player[]>(() => loadState('rugby_manager_players', INITIAL_PLAYERS));
   const [trainings, setTrainings] = useState<TrainingSession[]>(() => loadState('rugby_manager_trainings', INITIAL_TRAININGS));
   const [matches, setMatches] = useState<Match[]>(() => loadState('rugby_manager_matches', INITIAL_MATCHES));
+  
+  // --- SYNC CONFIG ---
+  const [firebaseConfig, setFirebaseConfig] = useState({ 
+    apiKey: localStorage.getItem('firebase_api_key') || '', 
+    projectId: localStorage.getItem('firebase_project_id') || '' 
+  });
+  const [syncStatus, setSyncStatus] = useState<string>('offline');
+  const [syncError, setSyncError] = useState<string>('');
+  const isRemoteUpdate = useRef(false);
 
-  // --- PERSISTENCE EFFECTS ---
+  // --- LOCAL PERSISTENCE ---
   useEffect(() => { saveState('rugby_manager_players', players); }, [players]);
   useEffect(() => { saveState('rugby_manager_trainings', trainings); }, [trainings]);
   useEffect(() => { saveState('rugby_manager_matches', matches); }, [matches]);
+
+  // --- FIREBASE SYNC: LISTENER (READ) ---
+  useEffect(() => {
+    if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+        setSyncStatus('idle');
+        return;
+    }
+
+    let unsub: any;
+    try {
+        const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // Listen to document updates
+        unsub = onSnapshot(
+            doc(db, "backups", "rugby_manager_data"), 
+            (docSnapshot) => {
+                const source = docSnapshot.metadata.hasPendingWrites ? "Local" : "Server";
+                
+                // If the update is local (optimistic UI), ignore to prevent loops
+                // If it's from server, update local state
+                if (source === "Server" && docSnapshot.exists()) {
+                    console.log("Recebendo atualização do servidor...");
+                    const data = docSnapshot.data();
+                    
+                    isRemoteUpdate.current = true; // Flag to prevent echoing back
+                    if(data.players) setPlayers(data.players);
+                    if(data.trainings) setTrainings(data.trainings);
+                    if(data.matches) setMatches(data.matches);
+                    setSyncStatus('synced');
+                }
+            },
+            (error) => {
+                console.error("Erro no listener:", error);
+                setSyncStatus('error');
+                setSyncError(error.message);
+            }
+        );
+        setSyncStatus('synced');
+    } catch (e: any) {
+        console.error("Erro ao iniciar sync:", e);
+        setSyncStatus('error');
+        setSyncError(e.message);
+    }
+
+    return () => {
+        if (unsub) unsub();
+    };
+  }, [firebaseConfig]);
+
+  // --- FIREBASE SYNC: AUTOSAVE (WRITE) ---
+  useEffect(() => {
+    if (!firebaseConfig.apiKey || !firebaseConfig.projectId) return;
+
+    // If this change came from the server, simply reset flag and do NOT save back
+    if (isRemoteUpdate.current) {
+        isRemoteUpdate.current = false;
+        return;
+    }
+
+    setSyncStatus('saving');
+
+    const handler = setTimeout(async () => {
+        try {
+            const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            
+            await setDoc(doc(db, "backups", "rugby_manager_data"), {
+                players,
+                trainings,
+                matches,
+                last_updated: new Date().toISOString()
+            });
+            setSyncStatus('synced');
+        } catch (e: any) {
+            console.error("Erro no autosave:", e);
+            setSyncStatus('error');
+        }
+    }, 2000); // 2 seconds debounce
+
+    return () => clearTimeout(handler);
+  }, [players, trainings, matches, firebaseConfig]);
 
   // --- ACTIONS ---
   const addPlayer = (p: Player) => setPlayers(prev => [...prev, p]);
@@ -1597,17 +1579,9 @@ const App = () => {
   const addMatch = (m: Match) => setMatches(prev => [...prev, m]);
   const updateMatch = (m: Match) => setMatches(prev => prev.map(curr => curr.id === m.id ? m : curr));
 
-  const handleCloudLoad = (p: Player[], t: TrainingSession[], m: Match[]) => {
-      if (window.confirm("Isto irá substituir os dados locais pelos da nuvem. Continuar?")) {
-          setPlayers(p);
-          setTrainings(t);
-          setMatches(m);
-      }
-  };
-
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
-      <Sidebar view={view} setView={setView} />
+      <Sidebar view={view} setView={setView} syncStatus={syncStatus} />
       <main className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto min-h-full">
             {/* Mobile Header */}
@@ -1632,7 +1606,7 @@ const App = () => {
           {view === 'TRAINING' && <TrainingView trainings={trainings} players={players} addTraining={addTraining} updateTraining={updateTraining} />}
           {view === 'MATCHES' && <MatchesView matches={matches} players={players} addMatch={addMatch} updateMatch={updateMatch} />}
           {view === 'AI_COACH' && <AICoachView />}
-          {view === 'DATA' && <DatabaseView players={players} trainings={trainings} matches={matches} onLoadData={handleCloudLoad} />}
+          {view === 'DATA' && <DatabaseView config={firebaseConfig} setConfig={setFirebaseConfig} syncStatus={syncStatus} errorMessage={syncError} />}
         </div>
       </main>
     </div>

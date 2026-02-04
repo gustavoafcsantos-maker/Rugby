@@ -3,13 +3,34 @@ import { Player, Position, Match, TrainingSession } from '../types';
 
 const MODEL_NAME = 'gemini-3-flash-preview';
 
+// Helper para obter a chave de forma segura
+const getAIClient = () => {
+  let apiKey = '';
+  
+  // 1. Tenta variável global direta (definida no index.html)
+  if (typeof window !== 'undefined' && (window as any).GEMINI_API_KEY) {
+      apiKey = (window as any).GEMINI_API_KEY;
+  }
+
+  // 2. Fallback
+  if (!apiKey && typeof process !== 'undefined' && process.env?.API_KEY) {
+      apiKey = process.env.API_KEY;
+  }
+
+  if (!apiKey || apiKey.includes("COLE_A_SUA_CHAVE")) {
+    throw new Error("MISSING_KEY");
+  }
+
+  return new GoogleGenAI({ apiKey });
+};
+
 export const generateTrainingPlan = async (
   playerCount: number,
   recentFocus: string,
   positions: string[]
 ): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = getAIClient();
     
     const prompt = `
       Atuo como treinador de rugby.
@@ -34,6 +55,9 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
+    if (error.message === "MISSING_KEY") {
+        return "⚠️ Erro: Chave de API não encontrada. Verifique o index.html.";
+    }
     return "Erro ao contactar o assistente técnico. Verifique a consola.";
   }
 };
@@ -44,7 +68,7 @@ export const generateMatchStrategy = async (
   location: string
 ): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = getAIClient();
 
     const forwards = squad.filter(p => [Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));
     const backs = squad.filter(p => ![Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));
@@ -75,6 +99,9 @@ export const generateMatchStrategy = async (
     return response.text || "Não foi possível gerar a estratégia.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
+    if (error.message === "MISSING_KEY") {
+        return "⚠️ Erro: Chave de API não encontrada.";
+    }
     return "Erro ao contactar o assistente técnico.";
   }
 };

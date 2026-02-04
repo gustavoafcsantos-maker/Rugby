@@ -1350,11 +1350,25 @@ const AICoachView = () => {
     const chatRef = useRef<any>(null);
 
     useEffect(() => {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        chatRef.current = ai.chats.create({ 
-            model: 'gemini-3-flash-preview', 
-            config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
-        });
+        // CORREÇÃO: Tenta obter a chave da global window, senão tenta process.env
+        let apiKey = '';
+        if (typeof window !== 'undefined' && (window as any).GEMINI_API_KEY) {
+             apiKey = (window as any).GEMINI_API_KEY;
+        } else if (process.env.API_KEY) {
+             apiKey = process.env.API_KEY;
+        }
+
+        if (apiKey) {
+            try {
+                const ai = new GoogleGenAI({ apiKey });
+                chatRef.current = ai.chats.create({ 
+                    model: 'gemini-3-flash-preview', 
+                    config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
+                });
+            } catch (e) {
+                console.error("Erro ao iniciar chat", e);
+            }
+        }
     }, []);
 
     const send = async () => {
@@ -1363,11 +1377,18 @@ const AICoachView = () => {
         setInput('');
         setMessages(p => [...p, { role: 'user', text: msg }]);
         setLoading(true);
+        
+        if (!chatRef.current) {
+             setMessages(p => [...p, { role: 'model', text: '⚠️ Erro: API Key não configurada. Verifique o ficheiro index.html.' }]);
+             setLoading(false);
+             return;
+        }
+
         try {
             const res = await chatRef.current.sendMessage({ message: msg });
             setMessages(p => [...p, { role: 'model', text: res.text }]);
         } catch(e) {
-            setMessages(p => [...p, { role: 'model', text: 'Desculpe, não consigo responder neste momento.' }]);
+            setMessages(p => [...p, { role: 'model', text: 'Desculpe, não consigo responder neste momento. Verifique a sua ligação ou a API Key.' }]);
         }
         setLoading(false);
     };

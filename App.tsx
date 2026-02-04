@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { 
-  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDatabase, IconCloud, IconSettings, IconRefresh, IconInfo
+  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDatabase, IconCloud, IconSettings, IconRefresh
 } from './components/Icons';
 import { 
   Player, Position, PlayerStatus, TrainingSession, Match, ViewState, AttendanceStatus, MatchSelectionStatus
@@ -1491,15 +1491,22 @@ const AICoachView = () => {
     }, []);
 
     const initChat = () => {
-        try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            chatRef.current = ai.chats.create({ 
-                model: 'gemini-3-flash-preview', 
-                config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
-            });
-        } catch (e) {
-            console.error("Erro ao iniciar chat", e);
-            setMessages(p => [...p, { role: 'model', text: '⚠️ Erro ao inicializar a IA. Verifique a consola.' }]);
+        // Guidelines: The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+        const apiKey = process.env.API_KEY;
+
+        if (apiKey) {
+            try {
+                const ai = new GoogleGenAI({ apiKey });
+                chatRef.current = ai.chats.create({ 
+                    model: 'gemini-3-flash-preview', 
+                    config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
+                });
+            } catch (e) {
+                console.error("Erro ao iniciar chat", e);
+                setMessages(p => [...p, { role: 'model', text: '⚠️ Erro ao inicializar a IA. Verifique a consola.' }]);
+            }
+        } else {
+             setMessages([{ role: 'model', text: '⚠️ A chave da API não está configurada (process.env.API_KEY).' }]);
         }
     };
 
@@ -1513,7 +1520,6 @@ const AICoachView = () => {
         if (!chatRef.current) {
              initChat();
              if (!chatRef.current) {
-                 setMessages(p => [...p, { role: 'model', text: '⚠️ Erro ao inicializar a IA.' }]);
                  setLoading(false);
                  return;
              }
@@ -1525,8 +1531,6 @@ const AICoachView = () => {
         } catch(e: any) {
             console.error("Chat Error:", e);
             let errorMsg = 'Desculpe, não consigo responder neste momento.';
-            if (e.message?.includes('API key') || e.status === 403) errorMsg += ' (A sua Chave API é inválida ou expirou)';
-            else if (e.message?.includes('fetch')) errorMsg += ' (Erro de Ligação)';
             setMessages(p => [...p, { role: 'model', text: errorMsg }]);
         }
         setLoading(false);

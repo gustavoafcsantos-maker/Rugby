@@ -5,31 +5,8 @@ const MODEL_NAME = 'gemini-3-flash-preview';
 
 // Helper para obter a chave de forma segura
 const getAIClient = () => {
-  let apiKey = '';
-
-  // 1. Tenta recuperar chave configurada manualmente pelo utilizador na UI
-  try {
-    const localKey = localStorage.getItem('rugby_manager_api_key');
-    if (localKey) apiKey = localKey;
-  } catch (e) {
-    console.warn("Erro ao ler localStorage", e);
-  }
-  
-  // 2. Tenta variável global direta (definida no index.html)
-  if (!apiKey && typeof window !== 'undefined' && (window as any).GEMINI_API_KEY) {
-      apiKey = (window as any).GEMINI_API_KEY;
-  }
-
-  // 3. Fallback
-  if (!apiKey && typeof process !== 'undefined' && process.env?.API_KEY) {
-      apiKey = process.env.API_KEY;
-  }
-
-  if (!apiKey || apiKey.includes("COLE_A_SUA_CHAVE")) {
-    throw new Error("MISSING_KEY");
-  }
-
-  return new GoogleGenAI({ apiKey });
+  // Guidelines: The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 export const generateTrainingPlan = async (
@@ -63,12 +40,6 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    if (error.message === "MISSING_KEY") {
-        return "⚠️ Erro: Chave de API não encontrada. Por favor configure a chave no menu do Assistente AI.";
-    }
-    if (error.message?.includes('API key') || error.status === 403) {
-        return "⚠️ Erro de Permissão: A Chave de API é inválida. Por favor atualize a chave no menu do Assistente AI.";
-    }
     return "Erro ao contactar o assistente técnico. Verifique a consola.";
   }
 };
@@ -110,9 +81,6 @@ export const generateMatchStrategy = async (
     return response.text || "Não foi possível gerar a estratégia.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    if (error.message === "MISSING_KEY") {
-        return "⚠️ Erro: Chave de API não encontrada. Configure no menu AI Coach.";
-    }
     return "Erro ao contactar o assistente técnico.";
   }
 };

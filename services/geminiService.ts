@@ -3,37 +3,13 @@ import { Player, Position, Match, TrainingSession } from '../types';
 
 const MODEL_NAME = 'gemini-3-flash-preview';
 
-// Helper seguro para obter a instância da IA
-// Procura explicitamente no window.process.env definido no index.html se process.env falhar
-const getAIClient = () => {
-  // Tenta várias fontes para a API Key de forma robusta
-  let apiKey = '';
-  
-  // 1. Tenta window (Polyfill do index.html)
-  if (typeof window !== 'undefined' && (window as any).process && (window as any).process.env) {
-    apiKey = (window as any).process.env.API_KEY;
-  }
-
-  // 2. Fallback para process normal (Build time)
-  if (!apiKey && typeof process !== 'undefined' && process.env) {
-    apiKey = process.env.API_KEY || '';
-  }
-
-  if (!apiKey || apiKey.includes("COLE_A_SUA_CHAVE")) {
-    console.error("API Key inválida ou não encontrada!");
-    throw new Error("MISSING_KEY");
-  }
-
-  return new GoogleGenAI({ apiKey });
-};
-
 export const generateTrainingPlan = async (
   playerCount: number,
   recentFocus: string,
   positions: string[]
 ): Promise<string> => {
   try {
-    const ai = getAIClient();
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
       Atuo como treinador de rugby.
@@ -58,16 +34,7 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    if (error.message === "MISSING_KEY") {
-        return "⚠️ Erro: API Key em falta. Abra o ficheiro index.html e cole a sua chave da Google AI no local indicado.";
-    }
-    if (error.toString().includes('403')) {
-      return "⚠️ Erro 403 (Acesso Negado): A sua API Key tem restrições de domínio. Vá à Google Cloud Console e adicione este domínio às permissões, ou remova as restrições.";
-    }
-    if (error.toString().includes('400')) {
-        return "Erro 400: Pedido inválido. Verifique se a API Key no index.html está correta.";
-    }
-    return "Erro ao contactar o assistente técnico. Verifique a consola para detalhes.";
+    return "Erro ao contactar o assistente técnico. Verifique a consola.";
   }
 };
 
@@ -77,7 +44,7 @@ export const generateMatchStrategy = async (
   location: string
 ): Promise<string> => {
   try {
-    const ai = getAIClient();
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const forwards = squad.filter(p => [Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));
     const backs = squad.filter(p => ![Position.PROP, Position.HOOKER, Position.LOCK, Position.FLANKER, Position.NO8].includes(p.position));
@@ -108,12 +75,6 @@ export const generateMatchStrategy = async (
     return response.text || "Não foi possível gerar a estratégia.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    if (error.message === "MISSING_KEY") {
-        return "⚠️ Erro: API Key em falta. Configure-a no ficheiro index.html.";
-    }
-    if (error.toString().includes('403')) {
-      return "⚠️ Erro 403: A API Key não permite este domínio. Verifique a Google Cloud Console.";
-    }
     return "Erro ao contactar o assistente técnico.";
   }
 };

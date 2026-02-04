@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { 
-  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload, IconDatabase, IconCloud, IconDownload, IconSettings, IconRefresh
+  IconUsers, IconCalendar, IconTrophy, IconBrain, IconDashboard, IconPlus, IconTrash, IconCheck, IconX, IconAlert, IconChevronRight, IconUserPlus, IconEdit, IconClock, IconShield, IconUpload
 } from './components/Icons';
 import { 
   Player, Position, PlayerStatus, TrainingSession, Match, ViewState, AttendanceStatus, MatchSelectionStatus
@@ -12,29 +12,7 @@ import { INITIAL_PLAYERS, INITIAL_TRAININGS, INITIAL_MATCHES } from './constants
 import { generateTrainingPlan, generateMatchStrategy } from './services/geminiService';
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI } from "@google/genai";
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
 import * as XLSX from 'xlsx';
-
-// --- Helper Functions ---
-const loadState = <T,>(key: string, fallback: T): T => {
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved === null) return fallback;
-    return JSON.parse(saved);
-  } catch (e) {
-    console.error(`Erro ao carregar ${key}:`, e);
-    return fallback;
-  }
-};
-
-const saveState = <T,>(key: string, data: T) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.error(`Erro ao guardar ${key}:`, e);
-  }
-};
 
 // --- Helper Components ---
 const StatusBadge = ({ status }: { status: PlayerStatus }) => {
@@ -74,20 +52,23 @@ const PlayerDetailsModal = ({
   const [formData, setFormData] = useState<Player>({ ...player });
   const [activeTab, setActiveTab] = useState<'details' | 'stats'>('details');
 
-  // Stats logic same as before...
+  // --- Statistics Calculation ---
+  
+  // Training Stats
   const playerTrainings = trainings.filter(t => t.attendance[player.id]);
   const totalTrainings = playerTrainings.length;
   const presentCount = playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.PRESENT).length;
   const attendanceRate = totalTrainings > 0 ? Math.round((presentCount / totalTrainings) * 100) : 0;
   
   const trainingDistribution = [
-    { name: 'Presente', value: presentCount, color: '#10b981' }, 
-    { name: 'Lesionado', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.INJURED).length, color: '#ef4444' }, 
-    { name: 'Trabalho/Esc', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.WORK_SCHOOL).length, color: '#3b82f6' }, 
-    { name: 'Indisp.', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.UNAVAILABLE).length, color: '#f59e0b' }, 
-    { name: 'Falta', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.ABSENT).length, color: '#64748b' }, 
+    { name: 'Presente', value: presentCount, color: '#10b981' }, // Emerald
+    { name: 'Lesionado', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.INJURED).length, color: '#ef4444' }, // Red
+    { name: 'Trabalho/Esc', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.WORK_SCHOOL).length, color: '#3b82f6' }, // Blue
+    { name: 'Indisp.', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.UNAVAILABLE).length, color: '#f59e0b' }, // Amber
+    { name: 'Falta', value: playerTrainings.filter(t => t.attendance[player.id] === AttendanceStatus.ABSENT).length, color: '#64748b' }, // Slate
   ].filter(d => d.value > 0);
 
+  // Match Stats
   const totalMatches = matches.length;
   const selectedMatches = matches.filter(m => m.playerStatus[player.id] === MatchSelectionStatus.SELECTED);
   const starts = matches.filter(m => m.startingXV.includes(player.id)).length;
@@ -132,9 +113,20 @@ const PlayerDetailsModal = ({
           </button>
         </div>
         
+        {/* Tabs */}
         <div className="flex border-b border-slate-200 shrink-0">
-            <button onClick={() => setActiveTab('details')} className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'details' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Dados Pessoais</button>
-            <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'stats' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Estatísticas & Performance</button>
+            <button 
+                onClick={() => setActiveTab('details')}
+                className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'details' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                Dados Pessoais
+            </button>
+            <button 
+                onClick={() => setActiveTab('stats')}
+                className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'stats' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                Estatísticas & Performance
+            </button>
         </div>
         
         <div className="overflow-y-auto p-6">
@@ -143,48 +135,110 @@ const PlayerDetailsModal = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
-                <input name="name" value={formData.name} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" required />
+                <input 
+                    name="name" 
+                    value={formData.name} 
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    required
+                />
                 </div>
+
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Posição</label>
-                <select name="position" value={formData.position} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                <select 
+                    name="position" 
+                    value={formData.position} 
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                >
                     {(Object.values(Position) as string[]).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
                 </div>
+
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                <select name="status" value={formData.status} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                <select 
+                    name="status" 
+                    value={formData.status} 
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                >
                     {(Object.values(PlayerStatus) as string[]).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 </div>
+
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Data de Nascimento</label>
-                <input type="date" name="birthDate" value={formData.birthDate || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+                <input 
+                    type="date"
+                    name="birthDate" 
+                    value={formData.birthDate || ''} 
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                />
                 </div>
+
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Localidade</label>
-                <input type="text" name="locality" value={formData.locality || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Ex: Lisboa" />
+                <input 
+                    type="text"
+                    name="locality" 
+                    value={formData.locality || ''} 
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    placeholder="Ex: Lisboa"
+                />
                 </div>
+
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Altura (cm)</label>
-                <input type="number" name="height" value={formData.height || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Ex: 185" />
+                <input 
+                    type="number"
+                    name="height" 
+                    value={formData.height || ''} 
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    placeholder="Ex: 185"
+                />
                 </div>
+
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Peso (kg)</label>
-                <input type="number" name="weight" value={formData.weight || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Ex: 95" />
+                <input 
+                    type="number"
+                    name="weight" 
+                    value={formData.weight || ''} 
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    placeholder="Ex: 95"
+                />
                 </div>
+
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Internacionalizações (Caps)</label>
-                <input type="number" name="caps" value={formData.caps} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+                <input 
+                    type="number"
+                    name="caps" 
+                    value={formData.caps} 
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                />
                 </div>
             </div>
+            
             <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-                <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">Guardar Alterações</button>
+                <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">
+                Cancelar
+                </button>
+                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+                Guardar Alterações
+                </button>
             </div>
             </form>
         ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+                {/* Highlights */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
                         <p className="text-emerald-800 text-sm font-medium flex items-center gap-2"><IconCheck className="w-4 h-4"/> Assiduidade</p>
@@ -206,15 +260,27 @@ const PlayerDetailsModal = ({
                         <p className="text-lg font-bold text-slate-700 mt-2 truncate">{player.position}</p>
                     </div>
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Training Chart */}
                     <div>
                         <h3 className="text-lg font-bold text-slate-800 mb-4">Análise de Treinos</h3>
                          <div className="h-64 border border-slate-100 rounded-xl bg-slate-50/50 p-4">
                             {totalTrainings > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={trainingDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                                        {trainingDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                                        <Pie
+                                        data={trainingDistribution}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={80}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                        >
+                                        {trainingDistribution.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
                                         </Pie>
                                         <Tooltip />
                                         <Legend />
@@ -225,6 +291,8 @@ const PlayerDetailsModal = ({
                             )}
                         </div>
                     </div>
+
+                    {/* Selection Breakdown */}
                     <div>
                          <h3 className="text-lg font-bold text-slate-800 mb-4">Análise de Não Convocatória</h3>
                          <div className="space-y-3">
@@ -254,7 +322,8 @@ const PlayerDetailsModal = ({
   );
 };
 
-// --- Training Details Modal ---
+// --- New Component: Training Details Modal ---
+
 const TrainingDetailsModal = ({ 
     training, 
     players, 
@@ -268,6 +337,7 @@ const TrainingDetailsModal = ({
 }) => {
     const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>(training.attendance || {});
 
+    // Ensure all players are in the attendance object (for new players added after training creation)
     useEffect(() => {
         const newAttendance = { ...attendance };
         let changed = false;
@@ -351,7 +421,8 @@ const TrainingDetailsModal = ({
     );
 };
 
-// --- Match Details Modal ---
+// --- New Component: Match Details Modal ---
+
 const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, players: Player[], onClose: () => void, onSave: (m: Match) => void }) => {
     const [activeTab, setActiveTab] = useState<'selection' | 'lineup' | 'strategy'>('selection');
     const [localMatch, setLocalMatch] = useState<Match>(match);
@@ -366,6 +437,7 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
         let newXV = [...(localMatch.startingXV || [])];
         let newSubs = [...(localMatch.subs || [])];
         
+        // Remove from Lineup if not selected
         if (status !== MatchSelectionStatus.SELECTED) {
             newXV = newXV.map(id => id === playerId ? '' : id);
             newSubs = newSubs.filter(id => id !== playerId);
@@ -376,26 +448,39 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     const handleLineupChange = (index: number, playerId: string, isSub: boolean = false) => {
         if (isSub) {
              const newSubs = [...(localMatch.subs || [])];
+             // Remove if exists elsewhere in subs
              const existingIdx = newSubs.indexOf(playerId);
              if (existingIdx !== -1) newSubs.splice(existingIdx, 1);
+             
+             // Ensure array size logic if needed, but for subs usually just push/pop. 
+             // Let's implement fixed slots for subs 16-23 (8 slots)
              while(newSubs.length < 8) newSubs.push('');
+             
+             // Check if in XV
              const xvIdx = (localMatch.startingXV || []).indexOf(playerId);
              if (xvIdx !== -1) {
                   const newXV = [...(localMatch.startingXV || [])];
                   newXV[xvIdx] = '';
                   updateMatch({ startingXV: newXV });
              }
+             
              newSubs[index] = playerId;
              updateMatch({ subs: newSubs });
         } else {
+            // XV Logic
             const newXV = [...(localMatch.startingXV || [])];
             while(newXV.length < 15) newXV.push('');
+            
+            // Remove from other XV slot
             const existingXVIdx = newXV.indexOf(playerId);
             if (existingXVIdx !== -1 && existingXVIdx !== index) newXV[existingXVIdx] = '';
+            
+            // Remove from Subs
             let newSubs = [...(localMatch.subs || [])];
             if (newSubs.includes(playerId)) {
                 newSubs = newSubs.filter(id => id !== playerId);
             }
+
             newXV[index] = playerId;
             updateMatch({ startingXV: newXV, subs: newSubs });
         }
@@ -410,9 +495,12 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     };
 
     const POSITIONS_1_15 = [
-        "1. Pilier Esq", "2. Talonador", "3. Pilier Drt", "4. 2ª Linha", "5. 2ª Linha",
-        "6. Asa Cego", "7. Asa Aberto", "8. Nº 8", "9. Médio Formação", "10. Abertura",
-        "11. Ponta Esq", "12. 1º Centro", "13. 2º Centro", "14. Ponta Drt", "15. Arreio"
+        "1. Pilier Esq", "2. Talonador", "3. Pilier Drt",
+        "4. 2ª Linha", "5. 2ª Linha",
+        "6. Asa Cego", "7. Asa Aberto", "8. Nº 8",
+        "9. Médio Formação", "10. Abertura",
+        "11. Ponta Esq", "12. 1º Centro", "13. 2º Centro", "14. Ponta Drt",
+        "15. Arreio"
     ];
 
     const selectedPool = players.filter(p => localMatch.playerStatus[p.id] === MatchSelectionStatus.SELECTED);
@@ -560,95 +648,6 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
-    );
-};
-
-// --- Database View (Firebase) ---
-const DatabaseView = ({ 
-    config, 
-    setConfig, 
-    syncStatus, 
-    errorMessage 
-}: { 
-    config: { apiKey: string, projectId: string },
-    setConfig: (c: { apiKey: string, projectId: string }) => void,
-    syncStatus: string,
-    errorMessage: string
-}) => {
-    
-    const saveConfig = () => {
-        localStorage.setItem('firebase_api_key', config.apiKey);
-        localStorage.setItem('firebase_project_id', config.projectId);
-        window.location.reload(); // Reload to re-init firebase
-    };
-
-    return (
-        <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-800">Base de Dados Google Firebase</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                        <IconSettings className="w-5 h-5 text-slate-500" /> Configuração de Ligação
-                    </h3>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Project ID</label>
-                            <input 
-                                type="text" 
-                                value={config.projectId} 
-                                onChange={e => setConfig({...config, projectId: e.target.value})}
-                                className="w-full px-3 py-2 border rounded-md text-sm" 
-                                placeholder="ex: rugby-manager-123"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Web API Key</label>
-                            <input 
-                                type="password" 
-                                value={config.apiKey} 
-                                onChange={e => setConfig({...config, apiKey: e.target.value})}
-                                className="w-full px-3 py-2 border rounded-md text-sm" 
-                                placeholder="AIzaSy..."
-                            />
-                        </div>
-                        <button onClick={saveConfig} className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 w-full font-medium transition-colors">
-                            Guardar e Conectar
-                        </button>
-                        <p className="text-xs text-slate-500 mt-2">Nota: Recarregue a página após alterar as chaves.</p>
-                    </div>
-                </Card>
-
-                <Card>
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                        <IconCloud className="w-5 h-5 text-blue-500" /> Estado da Sincronização
-                    </h3>
-                    <div className="space-y-4">
-                        <div className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 border-dashed ${syncStatus === 'synced' ? 'border-green-200 bg-green-50' : syncStatus === 'error' ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
-                            {syncStatus === 'synced' && <IconCheck className="w-12 h-12 text-green-500 mb-2" />}
-                            {syncStatus === 'saving' && <IconRefresh className="w-12 h-12 text-blue-500 mb-2 animate-spin" />}
-                            {syncStatus === 'error' && <IconAlert className="w-12 h-12 text-red-500 mb-2" />}
-                            {(syncStatus === 'offline' || syncStatus === 'idle') && <IconCloud className="w-12 h-12 text-slate-400 mb-2" />}
-                            
-                            <p className="font-bold text-lg text-slate-700">
-                                {syncStatus === 'synced' && 'Sincronizado'}
-                                {syncStatus === 'saving' && 'A Sincronizar...'}
-                                {syncStatus === 'error' && 'Erro na Ligação'}
-                                {syncStatus === 'offline' && 'Desligado (Offline)'}
-                                {syncStatus === 'idle' && 'A aguardar ligação...'}
-                            </p>
-                            {errorMessage && <p className="text-xs text-red-600 mt-2 text-center">{errorMessage}</p>}
-                        </div>
-                        
-                        <p className="text-sm text-slate-600">
-                            A sincronização é <strong>automática</strong>. 
-                            Qualquer alteração feita neste dispositivo é enviada para a nuvem. 
-                            Alterações feitas noutros dispositivos aparecem aqui em tempo real.
-                        </p>
-                    </div>
-                </Card>
             </div>
         </div>
     );
@@ -811,12 +810,14 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
+                // Obter dados como array de arrays para facilitar processamento
                 const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
                 processData(rows);
             } catch (error) {
                 console.error("Erro ao processar ficheiro:", error);
                 alert("Erro ao ler o ficheiro. Certifique-se que não está corrompido.");
             } finally {
+                // Limpar o input para permitir carregar o mesmo ficheiro novamente se necessário
                 if (fileInputRef.current) fileInputRef.current.value = '';
             }
         };
@@ -829,9 +830,12 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
             return;
         }
 
+        // Especificação do utilizador: Cabeçalho na linha 3 (index 2)
         const HEADER_ROW_INDEX = 2;
+        // Dados começam na linha 4 (index 3)
         const DATA_START_INDEX = 3; 
 
+        // Safe header processing
         const headerRow = rows[HEADER_ROW_INDEX];
         if (!headerRow) {
              alert("Linha de cabeçalho (linha 3) não encontrada.");
@@ -839,20 +843,28 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
         }
 
         const headers: string[] = [];
+        // Use loop to handle sparse arrays correctly
         for (let i = 0; i < headerRow.length; i++) {
             const val = headerRow[i];
             headers.push(val ? String(val).toLowerCase().trim() : '');
         }
         
+        // Colunas essenciais
+        // Especificação do utilizador: Nome na coluna 3 (index 2 - considerando A=0, B=1, C=2)
         const nameIdx = 2;
         
+        // Helper para encontrar colunas ignorando 2024 e preferindo 2025
         const findCol = (terms: string[]) => {
+            // 1. Tentar encontrar com termo E "2025"
             let idx = headers.findIndex(h => terms.some(t => h.includes(t)) && h.includes('2025'));
             if (idx !== -1) return idx;
+            
+            // 2. Tentar encontrar com termo MAS SEM "2024"
             idx = headers.findIndex(h => terms.some(t => h.includes(t)) && !h.includes('2024'));
             return idx;
         };
 
+        // Mapeamento opcional
         const birthDateIdx = findCol(['nascimento', 'data', 'birth']);
         const heightIdx = findCol(['altura', 'height']);
         const weightIdx = findCol(['peso', 'weight']);
@@ -861,17 +873,22 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
 
         let addedCount = 0;
         
+        // Loop a começar na linha especificada
         for (let i = DATA_START_INDEX; i < rows.length; i++) {
             const row = rows[i];
             if (!row) continue;
             
+            // Validar se existe nome na coluna especificada (coluna 3 -> index 2)
             const name = String(row[nameIdx] || '').trim();
             if (!name) continue;
 
+            // Date Parsing
             let birthDate = undefined;
             if (birthDateIdx !== -1) {
                 const rawDate = row[birthDateIdx];
+                // SheetJS por vezes retorna números para datas (Excel serial date)
                 if (typeof rawDate === 'string') {
+                    // Tentar formatos comuns DD/MM/YYYY ou YYYY-MM-DD
                     if (rawDate.includes('/')) {
                         const parts = rawDate.trim().split('/');
                         if (parts.length === 3) birthDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -881,12 +898,13 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 }
             }
 
+            // Stats Parsing
             let finalHeight = undefined;
             if (heightIdx !== -1) {
                 const rawHeight = row[heightIdx];
                 if (rawHeight) {
                     const h = parseFloat(String(rawHeight).replace(',', '.'));
-                    if (!isNaN(h)) finalHeight = h < 3 ? h * 100 : h; 
+                    if (!isNaN(h)) finalHeight = h < 3 ? h * 100 : h; // Converter metros para cm
                 }
             }
 
@@ -899,6 +917,7 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 }
             }
 
+            // Position Inference
             let position = Position.WING; 
             const posRaw = posIdx !== -1 ? (String(row[posIdx] || '')).toUpperCase() : '';
             
@@ -915,6 +934,7 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                  else if (posRaw.includes('PONTA') || posRaw.includes('WING')) position = Position.WING;
                  else if (posRaw.includes('ARREIO') || posRaw.includes('FULL')) position = Position.FULLBACK;
             } else {
+                 // Heurística básica se não houver posição
                  const w = finalWeight || 75;
                  const h = finalHeight || 175;
                  if (w > 100) position = Position.PROP;
@@ -1077,6 +1097,8 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
     );
 };
 
+// --- Missing Views & Main App ---
+
 const TrainingView = ({ trainings, players, addTraining, updateTraining }: { trainings: TrainingSession[], players: Player[], addTraining: (t: TrainingSession) => void, updateTraining: (t: TrainingSession) => void }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newDate, setNewDate] = useState('');
@@ -1088,6 +1110,7 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
     e.preventDefault();
     if (!newDate || !newFocus) return;
 
+    // Initialize attendance for all players
     const attendance: Record<string, AttendanceStatus> = {};
     players.forEach(p => attendance[p.id] = AttendanceStatus.PRESENT);
 
@@ -1111,7 +1134,7 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
       training.focus,
       players.map(p => p.position)
     );
-    alert(plan); 
+    alert(plan); // Placeholder for viewing plan
     setLoadingPlan(false);
   };
   
@@ -1204,7 +1227,7 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
             opponent: newMatchData.opponent,
             date: newMatchData.date,
             location: newMatchData.location,
-            playerStatus: {}, 
+            playerStatus: {}, // Default empty, can auto-fill with Available
             startingXV: Array(15).fill(''),
             subs: [],
             playingTime: {}
@@ -1326,52 +1349,16 @@ const AICoachView = () => {
     const [loading, setLoading] = useState(false);
     const chatRef = useRef<any>(null);
 
-    // Initial message to prompt user
     useEffect(() => {
-        if (messages.length === 0) {
-            setMessages([{role: 'model', text: 'Olá! Sou o teu adjunto virtual. Pergunta-me sobre exercícios de placagem, táticas de alinhamento ou gestão de fadiga.'}]);
-        }
-    }, []);
-
-    // Initialize Gemini Chat
-    useEffect(() => {
-        // CORREÇÃO CRÍTICA: Tentar window.process.env primeiro para garantir que lemos do index.html
-        let apiKey = '';
-        if (typeof window !== 'undefined' && (window as any).process && (window as any).process.env) {
-            apiKey = (window as any).process.env.API_KEY;
-        } else if (process.env.API_KEY) {
-            apiKey = process.env.API_KEY;
-        }
-        
-        // Verifica se a chave é válida ou se ainda é o placeholder
-        if (!apiKey || apiKey.includes("COLE_A_SUA_CHAVE")) {
-             setMessages(p => [
-                { role: 'model', text: '🔒 **Configuração em Falta**\n\nO Assistente AI precisa de uma chave válida para funcionar.\n\n**Como resolver:**\n1. Obtenha uma chave em [aistudio.google.com](https://aistudio.google.com)\n2. Abra o ficheiro `index.html` neste projeto.\n3. Cole a chave na variável `MINHA_CHAVE_GOOGLE`.\n4. Recarregue a página.' }
-             ]);
-             setLoading(true); // Bloqueia o input para evitar erros
-             return;
-        }
-
-        try {
-            const ai = new GoogleGenAI({ apiKey });
-            chatRef.current = ai.chats.create({ 
-                model: 'gemini-3-flash-preview', 
-                config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
-            });
-        } catch (e) {
-            console.error("Erro ao inicializar IA", e);
-            setMessages(p => [...p, { role: 'model', text: '⚠️ Erro interno ao iniciar o módulo de IA.' }]);
-        }
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        chatRef.current = ai.chats.create({ 
+            model: 'gemini-3-flash-preview', 
+            config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
+        });
     }, []);
 
     const send = async () => {
         if(!input.trim()) return;
-        
-        if (!chatRef.current) {
-             setMessages(p => [...p, { role: 'model', text: '⚠️ A IA não está ativa. Verifique se configurou a API Key no ficheiro `index.html` e recarregue a página.' }]);
-             return;
-        }
-
         const msg = input;
         setInput('');
         setMessages(p => [...p, { role: 'user', text: msg }]);
@@ -1379,25 +1366,27 @@ const AICoachView = () => {
         try {
             const res = await chatRef.current.sendMessage({ message: msg });
             setMessages(p => [...p, { role: 'model', text: res.text }]);
-        } catch(e: any) {
-            console.error(e);
-            let errorMsg = 'Desculpe, não consigo responder neste momento.';
-            if (e.toString().includes('403')) errorMsg = '⚠️ Erro 403: Acesso Negado. Se esta app estiver publicada, verifique se a API Key tem restrições de domínio (Referrer) na Google Cloud Console.';
-            if (e.toString().includes('400')) errorMsg = 'Erro 400: Pedido inválido. A chave API pode estar incorreta.';
-            setMessages(p => [...p, { role: 'model', text: errorMsg }]);
+        } catch(e) {
+            setMessages(p => [...p, { role: 'model', text: 'Desculpe, não consigo responder neste momento.' }]);
         }
         setLoading(false);
     };
 
     return (
         <Card className="h-[calc(100vh-8rem)] flex flex-col p-0 overflow-hidden">
-            <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+            <div className="bg-slate-50 p-4 border-b border-slate-200">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                     <IconBrain className="w-5 h-5 text-indigo-600" />
                     Assistente Técnico AI
                 </h3>
             </div>
             <div className="flex-1 overflow-y-auto space-y-4 p-4">
+                {messages.length === 0 && (
+                    <div className="text-center text-slate-400 mt-10">
+                        <IconBrain className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                        <p>Olá! Sou o teu adjunto virtual. <br/>Pergunta-me sobre exercícios de placagem, táticas de alinhamento ou gestão de fadiga.</p>
+                    </div>
+                )}
                 {messages.map((m, i) => (
                     <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] p-3 rounded-2xl ${m.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-800 rounded-tl-none'}`}>
@@ -1414,11 +1403,10 @@ const AICoachView = () => {
                     value={input} 
                     onChange={e => setInput(e.target.value)} 
                     onKeyDown={e => e.key === 'Enter' && send()}
-                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
+                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Escreve uma mensagem..."
-                    disabled={loading}
                 />
-                <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
+                <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled={loading}>
                     Enviar
                 </button>
             </div>
@@ -1426,14 +1414,13 @@ const AICoachView = () => {
     );
 };
 
-const Sidebar = ({ view, setView, syncStatus }: { view: ViewState, setView: (v: ViewState) => void, syncStatus: string }) => {
+const Sidebar = ({ view, setView }: { view: ViewState, setView: (v: ViewState) => void }) => {
   const menuItems: { id: ViewState, label: string, icon: React.FC<any> }[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: IconDashboard },
     { id: 'ROSTER', label: 'Plantel', icon: IconUsers },
     { id: 'TRAINING', label: 'Treinos', icon: IconCalendar },
     { id: 'MATCHES', label: 'Jogos', icon: IconTrophy },
     { id: 'AI_COACH', label: 'Assistente AI', icon: IconBrain },
-    { id: 'DATA', label: 'Base de Dados', icon: IconDatabase },
   ];
 
   return (
@@ -1457,12 +1444,7 @@ const Sidebar = ({ view, setView, syncStatus }: { view: ViewState, setView: (v: 
         ))}
       </nav>
       <div className="p-6 border-t border-slate-800">
-        <div className="flex items-center gap-2 text-xs font-medium">
-             {syncStatus === 'synced' && <><span className="w-2 h-2 rounded-full bg-green-500"></span> Online (Sincronizado)</>}
-             {syncStatus === 'saving' && <><span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> A Gravar...</>}
-             {syncStatus === 'offline' && <><span className="w-2 h-2 rounded-full bg-slate-500"></span> Offline</>}
-             {syncStatus === 'error' && <><span className="w-2 h-2 rounded-full bg-red-500"></span> Erro Ligação</>}
-        </div>
+        <p className="text-xs text-slate-500">v1.0.0 • Gemini 2.0</p>
       </div>
     </aside>
   );
@@ -1471,106 +1453,34 @@ const Sidebar = ({ view, setView, syncStatus }: { view: ViewState, setView: (v: 
 const App = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
   
-  // --- STATE INITIALIZATION ---
-  const [players, setPlayers] = useState<Player[]>(() => loadState('rugby_manager_players', INITIAL_PLAYERS));
-  const [trainings, setTrainings] = useState<TrainingSession[]>(() => loadState('rugby_manager_trainings', INITIAL_TRAININGS));
-  const [matches, setMatches] = useState<Match[]>(() => loadState('rugby_manager_matches', INITIAL_MATCHES));
-  
-  // --- SYNC CONFIG ---
-  const [firebaseConfig, setFirebaseConfig] = useState({ 
-    apiKey: localStorage.getItem('firebase_api_key') || '', 
-    projectId: localStorage.getItem('firebase_project_id') || '' 
+  // --- STATE INITIALIZATION WITH PERSISTENCE ---
+  const [players, setPlayers] = useState<Player[]>(() => {
+    const saved = localStorage.getItem('rugby_manager_players');
+    return saved ? JSON.parse(saved) : INITIAL_PLAYERS;
   });
-  const [syncStatus, setSyncStatus] = useState<string>('offline');
-  const [syncError, setSyncError] = useState<string>('');
-  const isRemoteUpdate = useRef(false);
+  
+  const [trainings, setTrainings] = useState<TrainingSession[]>(() => {
+    const saved = localStorage.getItem('rugby_manager_trainings');
+    return saved ? JSON.parse(saved) : INITIAL_TRAININGS;
+  });
+  
+  const [matches, setMatches] = useState<Match[]>(() => {
+    const saved = localStorage.getItem('rugby_manager_matches');
+    return saved ? JSON.parse(saved) : INITIAL_MATCHES;
+  });
 
-  // --- LOCAL PERSISTENCE ---
-  useEffect(() => { saveState('rugby_manager_players', players); }, [players]);
-  useEffect(() => { saveState('rugby_manager_trainings', trainings); }, [trainings]);
-  useEffect(() => { saveState('rugby_manager_matches', matches); }, [matches]);
-
-  // --- FIREBASE SYNC: LISTENER (READ) ---
+  // --- PERSISTENCE EFFECTS ---
   useEffect(() => {
-    if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-        setSyncStatus('idle');
-        return;
-    }
+    localStorage.setItem('rugby_manager_players', JSON.stringify(players));
+  }, [players]);
 
-    let unsub: any;
-    try {
-        const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        
-        // Listen to document updates
-        unsub = onSnapshot(
-            doc(db, "backups", "rugby_manager_data"), 
-            (docSnapshot) => {
-                const source = docSnapshot.metadata.hasPendingWrites ? "Local" : "Server";
-                
-                // If the update is local (optimistic UI), ignore to prevent loops
-                // If it's from server, update local state
-                if (source === "Server" && docSnapshot.exists()) {
-                    console.log("Recebendo atualização do servidor...");
-                    const data = docSnapshot.data();
-                    
-                    isRemoteUpdate.current = true; // Flag to prevent echoing back
-                    if(data.players) setPlayers(data.players);
-                    if(data.trainings) setTrainings(data.trainings);
-                    if(data.matches) setMatches(data.matches);
-                    setSyncStatus('synced');
-                }
-            },
-            (error) => {
-                console.error("Erro no listener:", error);
-                setSyncStatus('error');
-                setSyncError(error.message);
-            }
-        );
-        setSyncStatus('synced');
-    } catch (e: any) {
-        console.error("Erro ao iniciar sync:", e);
-        setSyncStatus('error');
-        setSyncError(e.message);
-    }
-
-    return () => {
-        if (unsub) unsub();
-    };
-  }, [firebaseConfig]);
-
-  // --- FIREBASE SYNC: AUTOSAVE (WRITE) ---
   useEffect(() => {
-    if (!firebaseConfig.apiKey || !firebaseConfig.projectId) return;
+    localStorage.setItem('rugby_manager_trainings', JSON.stringify(trainings));
+  }, [trainings]);
 
-    // If this change came from the server, simply reset flag and do NOT save back
-    if (isRemoteUpdate.current) {
-        isRemoteUpdate.current = false;
-        return;
-    }
-
-    setSyncStatus('saving');
-
-    const handler = setTimeout(async () => {
-        try {
-            const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-            const db = getFirestore(app);
-            
-            await setDoc(doc(db, "backups", "rugby_manager_data"), {
-                players,
-                trainings,
-                matches,
-                last_updated: new Date().toISOString()
-            });
-            setSyncStatus('synced');
-        } catch (e: any) {
-            console.error("Erro no autosave:", e);
-            setSyncStatus('error');
-        }
-    }, 2000); // 2 seconds debounce
-
-    return () => clearTimeout(handler);
-  }, [players, trainings, matches, firebaseConfig]);
+  useEffect(() => {
+    localStorage.setItem('rugby_manager_matches', JSON.stringify(matches));
+  }, [matches]);
 
   // --- ACTIONS ---
   const addPlayer = (p: Player) => setPlayers(prev => [...prev, p]);
@@ -1585,10 +1495,10 @@ const App = () => {
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
-      <Sidebar view={view} setView={setView} syncStatus={syncStatus} />
+      <Sidebar view={view} setView={setView} />
       <main className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto min-h-full">
-            {/* Mobile Header */}
+            {/* Mobile Nav Toggle could go here */}
             <div className="md:hidden mb-4 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
                  <h1 className="font-bold text-slate-800">Rugby Manager</h1>
                  <select 
@@ -1601,7 +1511,6 @@ const App = () => {
                      <option value="TRAINING">Treinos</option>
                      <option value="MATCHES">Jogos</option>
                      <option value="AI_COACH">AI Coach</option>
-                     <option value="DATA">Base de Dados</option>
                  </select>
             </div>
 
@@ -1610,7 +1519,6 @@ const App = () => {
           {view === 'TRAINING' && <TrainingView trainings={trainings} players={players} addTraining={addTraining} updateTraining={updateTraining} />}
           {view === 'MATCHES' && <MatchesView matches={matches} players={players} addMatch={addMatch} updateMatch={updateMatch} />}
           {view === 'AI_COACH' && <AICoachView />}
-          {view === 'DATA' && <DatabaseView config={firebaseConfig} setConfig={setFirebaseConfig} syncStatus={syncStatus} errorMessage={syncError} />}
         </div>
       </main>
     </div>

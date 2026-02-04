@@ -7,24 +7,31 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
-      // POLYFILL ROBUSTO PARA process.env
-      window.process = window.process || {};
-      window.process.env = window.process.env || {};
-      
       // --- CONFIGURAÇÃO DA GOOGLE GEMINI API ---
       // 1. Obtenha a sua chave em: https://aistudio.google.com/
       // 2. Cole a chave abaixo, substituindo o texto entre aspas.
       
-      const MINHA_CHAVE_GOOGLE = AIzaSyA-DN3Hq7diTcNAw0QdWP3TgpUJ7HylJLg; 
+      // DEFINA A SUA CHAVE AQUI:
+      var CHAVE_DO_UTILIZADOR = "COLE_A_SUA_CHAVE_AQUI";
       
-      // Lógica de injeção da chave
-      if (!window.process.env.API_KEY) {
-        if (MINHA_CHAVE_GOOGLE && MINHA_CHAVE_GOOGLE !== AIzaSyA-DN3Hq7diTcNAw0QdWP3TgpUJ7HylJLg) {
-            window.process.env.API_KEY = MINHA_CHAVE_GOOGLE;
-        } else {
-            console.warn("⚠️ AVISO: API Key da Google AI não configurada no index.html. As funcionalidades de IA não funcionarão.");
-            // Não definimos fallback para evitar erros 403 confusos de chaves partilhadas/bloqueadas.
-        }
+      // --------------------------------------------------------
+      // Lógica de injeção (Não mexer daqui para baixo)
+      // --------------------------------------------------------
+      if (CHAVE_DO_UTILIZADOR) {
+          CHAVE_DO_UTILIZADOR = CHAVE_DO_UTILIZADOR.trim();
+      }
+      
+      // Colocamos numa variável global direta para evitar conflitos com "process" de bundlers
+      window.GEMINI_API_KEY = CHAVE_DO_UTILIZADOR;
+      
+      // Fallback para compatibilidade com process.env
+      window.process = window.process || {};
+      window.process.env = window.process.env || {};
+      
+      if (CHAVE_DO_UTILIZADOR && !CHAVE_DO_UTILIZADOR.includes("COLE_A_SUA_CHAVE")) {
+          window.process.env.API_KEY = CHAVE_DO_UTILIZADOR;
+      } else {
+          console.warn("⚠️ API Key não configurada no index.html");
       }
     </script>
     <style>

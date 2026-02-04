@@ -356,6 +356,7 @@ const TrainingDetailsModal = ({
     onSave: (t: TrainingSession) => void 
 }) => {
     const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>(training.attendance || {});
+    const [activeTab, setActiveTab] = useState<'attendance' | 'plan'>('attendance');
 
     useEffect(() => {
         const newAttendance = { ...attendance };
@@ -390,42 +391,74 @@ const TrainingDetailsModal = ({
                      </div>
                      <button onClick={onClose} className="p-2 hover:bg-white rounded-full transition-colors"><IconX className="w-6 h-6 text-slate-400 hover:text-slate-600" /></button>
                  </div>
+
+                 {/* Tabs */}
+                 <div className="flex border-b border-slate-200 shrink-0 bg-slate-50/50">
+                    <button 
+                        onClick={() => setActiveTab('attendance')} 
+                        className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'attendance' ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Presenças
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('plan')} 
+                        className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'plan' ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Plano de Treino AI {training.aiPlan && <IconCheck className="w-3 h-3 inline ml-1 text-green-500"/>}
+                    </button>
+                 </div>
                  
                  <div className="p-0 overflow-y-auto flex-1">
-                     <table className="w-full text-left border-collapse">
-                         <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-                             <tr>
-                                 <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Jogador</th>
-                                 <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Posição</th>
-                                 <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Presença</th>
-                             </tr>
-                         </thead>
-                         <tbody className="divide-y divide-slate-100">
-                             {players.map(p => (
-                                 <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                     <td className="px-6 py-4 text-slate-800 font-medium">{p.name}</td>
-                                     <td className="px-6 py-4 text-slate-500 text-sm">{p.position}</td>
-                                     <td className="px-6 py-4">
-                                         <select 
-                                            value={attendance[p.id] || AttendanceStatus.PRESENT} 
-                                            onChange={(e) => handleStatusChange(p.id, e.target.value as AttendanceStatus)}
-                                            className={`px-3 py-1.5 rounded-lg border text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-colors
-                                                ${attendance[p.id] === AttendanceStatus.PRESENT ? 'bg-green-50 border-green-200 text-green-700' : ''}
-                                                ${attendance[p.id] === AttendanceStatus.ABSENT ? 'bg-slate-50 border-slate-200 text-slate-600' : ''}
-                                                ${attendance[p.id] === AttendanceStatus.INJURED ? 'bg-red-50 border-red-200 text-red-700' : ''}
-                                                ${attendance[p.id] === AttendanceStatus.UNAVAILABLE ? 'bg-amber-50 border-amber-200 text-amber-700' : ''}
-                                                ${attendance[p.id] === AttendanceStatus.WORK_SCHOOL ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}
-                                            `}
-                                         >
-                                             {(Object.values(AttendanceStatus) as string[]).map(s => (
-                                                 <option key={s} value={s}>{s}</option>
-                                             ))}
-                                         </select>
-                                     </td>
+                     {activeTab === 'attendance' ? (
+                         <table className="w-full text-left border-collapse">
+                             <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                                 <tr>
+                                     <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Jogador</th>
+                                     <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Posição</th>
+                                     <th className="px-6 py-3 text-xs font-bold uppercase text-slate-500 tracking-wider">Presença</th>
                                  </tr>
-                             ))}
-                         </tbody>
-                     </table>
+                             </thead>
+                             <tbody className="divide-y divide-slate-100">
+                                 {players.map(p => (
+                                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                                         <td className="px-6 py-4 text-slate-800 font-medium">{p.name}</td>
+                                         <td className="px-6 py-4 text-slate-500 text-sm">{p.position}</td>
+                                         <td className="px-6 py-4">
+                                             <select 
+                                                value={attendance[p.id] || AttendanceStatus.PRESENT} 
+                                                onChange={(e) => handleStatusChange(p.id, e.target.value as AttendanceStatus)}
+                                                className={`px-3 py-1.5 rounded-lg border text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-colors
+                                                    ${attendance[p.id] === AttendanceStatus.PRESENT ? 'bg-green-50 border-green-200 text-green-700' : ''}
+                                                    ${attendance[p.id] === AttendanceStatus.ABSENT ? 'bg-slate-50 border-slate-200 text-slate-600' : ''}
+                                                    ${attendance[p.id] === AttendanceStatus.INJURED ? 'bg-red-50 border-red-200 text-red-700' : ''}
+                                                    ${attendance[p.id] === AttendanceStatus.UNAVAILABLE ? 'bg-amber-50 border-amber-200 text-amber-700' : ''}
+                                                    ${attendance[p.id] === AttendanceStatus.WORK_SCHOOL ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}
+                                                `}
+                                             >
+                                                 {(Object.values(AttendanceStatus) as string[]).map(s => (
+                                                     <option key={s} value={s}>{s}</option>
+                                                 ))}
+                                             </select>
+                                         </td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                         </table>
+                     ) : (
+                         <div className="p-8">
+                             {training.aiPlan ? (
+                                <div className="prose prose-slate max-w-none prose-headings:text-indigo-800 prose-a:text-indigo-600">
+                                    <ReactMarkdown>{training.aiPlan}</ReactMarkdown>
+                                </div>
+                             ) : (
+                                <div className="text-center py-10 text-slate-400">
+                                    <IconBrain className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                                    <h4 className="text-lg font-medium text-slate-700 mb-2">Sem Plano Gerado</h4>
+                                    <p className="text-sm max-w-xs mx-auto">Gere um plano de treino automático na lista de treinos para ver as sugestões aqui.</p>
+                                </div>
+                             )}
+                         </div>
+                     )}
                  </div>
                  
                  <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-xl">
@@ -900,12 +933,14 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
+                // Obter dados como array de arrays para facilitar processamento
                 const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
                 processData(rows);
             } catch (error) {
                 console.error("Erro ao processar ficheiro:", error);
                 alert("Erro ao ler o ficheiro. Certifique-se que não está corrompido.");
             } finally {
+                // Limpar o input para permitir carregar o mesmo ficheiro novamente se necessário
                 if (fileInputRef.current) fileInputRef.current.value = '';
             }
         };
@@ -918,9 +953,12 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
             return;
         }
 
+        // Especificação do utilizador: Cabeçalho na linha 3 (index 2)
         const HEADER_ROW_INDEX = 2;
+        // Dados começam na linha 4 (index 3)
         const DATA_START_INDEX = 3; 
 
+        // Safe header processing
         const headerRow = rows[HEADER_ROW_INDEX];
         if (!headerRow) {
              alert("Linha de cabeçalho (linha 3) não encontrada.");
@@ -928,20 +966,28 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
         }
 
         const headers: string[] = [];
+        // Use loop to handle sparse arrays correctly
         for (let i = 0; i < headerRow.length; i++) {
             const val = headerRow[i];
             headers.push(val ? String(val).toLowerCase().trim() : '');
         }
         
+        // Colunas essenciais
+        // Especificação do utilizador: Nome na coluna 3 (index 2 - considerando A=0, B=1, C=2)
         const nameIdx = 2;
         
+        // Helper para encontrar colunas ignorando 2024 e preferindo 2025
         const findCol = (terms: string[]) => {
+            // 1. Tentar encontrar com termo E "2025"
             let idx = headers.findIndex(h => terms.some(t => h.includes(t)) && h.includes('2025'));
             if (idx !== -1) return idx;
+            
+            // 2. Tentar encontrar com termo MAS SEM "2024"
             idx = headers.findIndex(h => terms.some(t => h.includes(t)) && !h.includes('2024'));
             return idx;
         };
 
+        // Mapeamento opcional
         const birthDateIdx = findCol(['nascimento', 'data', 'birth']);
         const heightIdx = findCol(['altura', 'height']);
         const weightIdx = findCol(['peso', 'weight']);
@@ -950,17 +996,22 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
 
         let addedCount = 0;
         
+        // Loop a começar na linha especificada
         for (let i = DATA_START_INDEX; i < rows.length; i++) {
             const row = rows[i];
             if (!row) continue;
             
+            // Validar se existe nome na coluna especificada (coluna 3 -> index 2)
             const name = String(row[nameIdx] || '').trim();
             if (!name) continue;
 
+            // Date Parsing
             let birthDate = undefined;
             if (birthDateIdx !== -1) {
                 const rawDate = row[birthDateIdx];
+                // SheetJS por vezes retorna números para datas (Excel serial date)
                 if (typeof rawDate === 'string') {
+                    // Tentar formatos comuns DD/MM/YYYY ou YYYY-MM-DD
                     if (rawDate.includes('/')) {
                         const parts = rawDate.trim().split('/');
                         if (parts.length === 3) birthDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -970,12 +1021,13 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 }
             }
 
+            // Stats Parsing
             let finalHeight = undefined;
             if (heightIdx !== -1) {
                 const rawHeight = row[heightIdx];
                 if (rawHeight) {
                     const h = parseFloat(String(rawHeight).replace(',', '.'));
-                    if (!isNaN(h)) finalHeight = h < 3 ? h * 100 : h; 
+                    if (!isNaN(h)) finalHeight = h < 3 ? h * 100 : h; // Converter metros para cm
                 }
             }
 
@@ -988,6 +1040,7 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 }
             }
 
+            // Position Inference
             let position = Position.WING; 
             const posRaw = posIdx !== -1 ? (String(row[posIdx] || '')).toUpperCase() : '';
             
@@ -1004,6 +1057,7 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                  else if (posRaw.includes('PONTA') || posRaw.includes('WING')) position = Position.WING;
                  else if (posRaw.includes('ARREIO') || posRaw.includes('FULL')) position = Position.FULLBACK;
             } else {
+                 // Heurística básica se não houver posição
                  const w = finalWeight || 75;
                  const h = finalHeight || 175;
                  if (w > 100) position = Position.PROP;
@@ -1166,17 +1220,20 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
     );
 };
 
+// --- Missing Views & Main App ---
+
 const TrainingView = ({ trainings, players, addTraining, updateTraining }: { trainings: TrainingSession[], players: Player[], addTraining: (t: TrainingSession) => void, updateTraining: (t: TrainingSession) => void }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newDate, setNewDate] = useState('');
   const [newFocus, setNewFocus] = useState('');
-  const [loadingPlan, setLoadingPlan] = useState(false);
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [selectedTraining, setSelectedTraining] = useState<TrainingSession | null>(null);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDate || !newFocus) return;
 
+    // Initialize attendance for all players
     const attendance: Record<string, AttendanceStatus> = {};
     players.forEach(p => attendance[p.id] = AttendanceStatus.PRESENT);
 
@@ -1194,14 +1251,18 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
   };
 
   const handleGeneratePlan = async (training: TrainingSession) => {
-    setLoadingPlan(true);
+    setLoadingPlanId(training.id);
     const plan = await generateTrainingPlan(
       Object.values(training.attendance).filter(s => s === AttendanceStatus.PRESENT).length,
       training.focus,
       players.map(p => p.position)
     );
-    alert(plan); 
-    setLoadingPlan(false);
+    
+    updateTraining({
+        ...training,
+        aiPlan: plan
+    });
+    setLoadingPlanId(null);
   };
   
   return (
@@ -1253,9 +1314,20 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
               <div className="flex items-center gap-4">
                 <button 
                   onClick={(e) => { e.stopPropagation(); handleGeneratePlan(t); }}
-                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium px-3 py-1 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors z-10"
+                  className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors z-10 flex items-center gap-2
+                    ${t.aiPlan 
+                        ? 'text-green-700 bg-green-50 hover:bg-green-100 border border-green-200' 
+                        : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+                    }`}
+                  disabled={loadingPlanId === t.id}
                 >
-                  {loadingPlan ? 'A gerar...' : 'Gerar Plano AI'}
+                  {loadingPlanId === t.id ? (
+                      <><IconRefresh className="w-4 h-4 animate-spin"/> A gerar...</>
+                  ) : t.aiPlan ? (
+                      <><IconCheck className="w-4 h-4"/> Regenerar Plano AI</>
+                  ) : (
+                      'Gerar Plano AI'
+                  )}
                 </button>
                 <div className="text-right">
                     <div className="text-2xl font-bold text-blue-600">

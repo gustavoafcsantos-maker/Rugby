@@ -45,6 +45,7 @@ export interface TrainingSession {
   focus: string;
   // Alterado de string[] para um mapa de ID -> Status
   attendance: Record<string, AttendanceStatus>;
+  aiPlan?: string; // Plano gerado pela IA
 }
 
 export enum MatchSelectionStatus {

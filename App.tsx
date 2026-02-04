@@ -1497,21 +1497,21 @@ const AICoachView = () => {
 
     const initChat = () => {
         setApiKeyError(false);
-        // Prioridade: LocalStorage > process.env
+        // Prioridade: LocalStorage > process.env > window.GEMINI_API_KEY > fallback hardcoded
         let apiKey = localStorage.getItem('rugby_manager_api_key') || '';
         
-        // Safe access to process.env in browser environment
-        if (!apiKey && typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
-             apiKey = (window as any).process.env.API_KEY;
+        if (!apiKey && typeof window !== 'undefined') {
+             // Tentar obter da variável global injetada
+             apiKey = (window as any).GEMINI_API_KEY || (window as any).process?.env?.API_KEY;
+        }
+
+        // Fallback final para a chave fornecida pelo utilizador
+        if (!apiKey) {
+            apiKey = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
         }
 
         if (apiKey && !apiKey.includes("COLE_A_SUA_CHAVE")) {
             try {
-                // Se o utilizador definiu uma chave manual, garantimos que também fica no process.env para os outros serviços
-                if (typeof window !== 'undefined' && (window as any).process && (window as any).process.env) {
-                    (window as any).process.env.API_KEY = apiKey;
-                }
-
                 const ai = new GoogleGenAI({ apiKey });
                 chatRef.current = ai.chats.create({ 
                     model: 'gemini-3-flash-preview', 

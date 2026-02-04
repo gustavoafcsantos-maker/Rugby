@@ -5,8 +5,19 @@ const MODEL_NAME = 'gemini-3-flash-preview';
 
 // Helper para obter a chave de forma segura
 const getAIClient = () => {
-  // Guidelines: The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  let apiKey = process.env.API_KEY;
+  
+  // Fallback para ambiente de browser onde process.env pode não estar definido
+  if (!apiKey && typeof window !== 'undefined') {
+    apiKey = (window as any).GEMINI_API_KEY || (window as any).process?.env?.API_KEY;
+  }
+
+  // Fallback de segurança para a chave fornecida explicitamente pelo utilizador
+  if (!apiKey) {
+      apiKey = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
+  }
+
+  return new GoogleGenAI({ apiKey: apiKey });
 };
 
 export const generateTrainingPlan = async (
@@ -40,7 +51,7 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico. Verifique a consola.";
+    return "Erro ao contactar o assistente técnico. Verifique se a chave de API está correta.";
   }
 };
 

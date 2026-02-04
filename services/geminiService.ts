@@ -21,7 +21,7 @@ const getAIClient = () => {
 
   if (!apiKey || apiKey.includes("COLE_A_SUA_CHAVE")) {
     console.error("API Key inválida ou não encontrada!");
-    throw new Error("API Key em falta. Verifique o ficheiro index.html.");
+    throw new Error("MISSING_KEY");
   }
 
   return new GoogleGenAI({ apiKey });
@@ -58,11 +58,14 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
+    if (error.message === "MISSING_KEY") {
+        return "⚠️ Erro: API Key em falta. Abra o ficheiro index.html e cole a sua chave da Google AI no local indicado.";
+    }
     if (error.toString().includes('403')) {
-      return "Erro 403: Acesso negado. A API Key não permite este domínio. Adicione o URL do Vercel nas restrições da chave na Google Cloud Console.";
+      return "⚠️ Erro 403 (Acesso Negado): A sua API Key tem restrições de domínio. Vá à Google Cloud Console e adicione este domínio às permissões, ou remova as restrições.";
     }
     if (error.toString().includes('400')) {
-        return "Erro 400: Pedido inválido. Verifique se a API Key está correta no index.html.";
+        return "Erro 400: Pedido inválido. Verifique se a API Key no index.html está correta.";
     }
     return "Erro ao contactar o assistente técnico. Verifique a consola para detalhes.";
   }
@@ -105,8 +108,11 @@ export const generateMatchStrategy = async (
     return response.text || "Não foi possível gerar a estratégia.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
+    if (error.message === "MISSING_KEY") {
+        return "⚠️ Erro: API Key em falta. Configure-a no ficheiro index.html.";
+    }
     if (error.toString().includes('403')) {
-      return "Erro 403: Acesso negado. Verifique as restrições de domínio da sua API Key.";
+      return "⚠️ Erro 403: A API Key não permite este domínio. Verifique a Google Cloud Console.";
     }
     return "Erro ao contactar o assistente técnico.";
   }

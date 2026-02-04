@@ -11,17 +11,19 @@
       window.process = window.process || {};
       window.process.env = window.process.env || {};
       
-      // --- COLOQUE AQUI A SUA NOVA API KEY ---
-      // Substitua o texto abaixo pela chave que criou (começa por AIza...)
+      // --- CONFIGURAÇÃO DA GOOGLE GEMINI API ---
+      // 1. Obtenha a sua chave em: https://aistudio.google.com/
+      // 2. Cole a chave abaixo, substituindo o texto entre aspas.
+      
       const MINHA_CHAVE_GOOGLE = "COLE_A_SUA_CHAVE_AQUI"; 
       
-      // Lógica de fallback para garantir que a app não rebenta se esquecer de trocar
+      // Lógica de injeção da chave
       if (!window.process.env.API_KEY) {
-        if (MINHA_CHAVE_GOOGLE !== "COLE_A_SUA_CHAVE_AQUI") {
+        if (MINHA_CHAVE_GOOGLE && MINHA_CHAVE_GOOGLE !== "COLE_A_SUA_CHAVE_AQUI") {
             window.process.env.API_KEY = MINHA_CHAVE_GOOGLE;
         } else {
-            // Chave de demonstração (pode falhar com erro 403 em produção)
-            window.process.env.API_KEY = "AIzaSyCYKKJCX_qoBC1qTtbqp_BpwrhNTDTxbVM"; 
+            console.warn("⚠️ AVISO: API Key da Google AI não configurada no index.html. As funcionalidades de IA não funcionarão.");
+            // Não definimos fallback para evitar erros 403 confusos de chaves partilhadas/bloqueadas.
         }
       }
     </script>

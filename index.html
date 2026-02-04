@@ -15,11 +15,11 @@
       // 1. Obtenha a sua chave em: https://aistudio.google.com/
       // 2. Cole a chave abaixo, substituindo o texto entre aspas.
       
-      const MINHA_CHAVE_GOOGLE = "COLE_A_SUA_CHAVE_AQUI"; 
+      const MINHA_CHAVE_GOOGLE = "AIzaSyBz6u0TkgCmDtqsF5zTu6iMhYpp-K0qFo8"; 
       
       // Lógica de injeção da chave
       if (!window.process.env.API_KEY) {
-        if (MINHA_CHAVE_GOOGLE && MINHA_CHAVE_GOOGLE !== "COLE_A_SUA_CHAVE_AQUI") {
+        if (MINHA_CHAVE_GOOGLE && MINHA_CHAVE_GOOGLE !== "AIzaSyBz6u0TkgCmDtqsF5zTu6iMhYpp-K0qFo8") {
             window.process.env.API_KEY = MINHA_CHAVE_GOOGLE;
         } else {
             console.warn("⚠️ AVISO: API Key da Google AI não configurada no index.html. As funcionalidades de IA não funcionarão.");

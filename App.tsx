@@ -344,8 +344,6 @@ const PlayerDetailsModal = ({
 };
 
 // --- Training Details Modal ---
-// ... (The TrainingDetailsModal code remains exactly the same as before) ...
-// To ensure the file is complete, I will include it.
 const TrainingDetailsModal = ({ 
     training, 
     players, 
@@ -476,7 +474,6 @@ const TrainingDetailsModal = ({
 };
 
 // --- Match Details Modal ---
-// ... (MatchDetailsModal code same as before, included for file completeness)
 const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, players: Player[], onClose: () => void, onSave: (m: Match) => void }) => {
     const [activeTab, setActiveTab] = useState<'selection' | 'lineup' | 'strategy'>('selection');
     const [localMatch, setLocalMatch] = useState<Match>(match);
@@ -691,7 +688,6 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
 };
 
 // --- Database View (Firebase) ---
-// ... (DatabaseView code remains exactly the same as before) ...
 const DatabaseView = ({ 
     config, 
     setConfig, 
@@ -781,11 +777,8 @@ const DatabaseView = ({
 };
 
 // --- Sub-View Components ---
-// ... (DashboardView, RosterView, TrainingView, MatchesView all remain exactly the same) ...
-// Included for completeness.
 
 const DashboardView = ({ players, trainings, matches }: { players: Player[], trainings: TrainingSession[], matches: Match[] }) => {
-    // ... same content
     const totalPlayers = players.length;
     const availablePlayers = players.filter(p => p.status === PlayerStatus.AVAILABLE).length;
     const injuredPlayers = players.filter(p => p.status === PlayerStatus.INJURED).length;
@@ -909,7 +902,6 @@ const DashboardView = ({ players, trainings, matches }: { players: Player[], tra
 };
 
 const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, updatePlayer }: { players: Player[], trainings: TrainingSession[], matches: Match[], addPlayer: (p: Player) => void, removePlayer: (id: string) => void, updatePlayer: (p: Player) => void }) => {
-    // ... same code
     const [isAdding, setIsAdding] = useState(false);
     const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
     const [newPlayerName, setNewPlayerName] = useState('');
@@ -941,12 +933,14 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
+                // Obter dados como array de arrays para facilitar processamento
                 const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
                 processData(rows);
             } catch (error) {
                 console.error("Erro ao processar ficheiro:", error);
                 alert("Erro ao ler o ficheiro. Certifique-se que não está corrompido.");
             } finally {
+                // Limpar o input para permitir carregar o mesmo ficheiro novamente se necessário
                 if (fileInputRef.current) fileInputRef.current.value = '';
             }
         };
@@ -958,40 +952,66 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
             alert("O ficheiro parece não ter linhas suficientes (cabeçalho esperado na linha 3).");
             return;
         }
+
+        // Especificação do utilizador: Cabeçalho na linha 3 (index 2)
         const HEADER_ROW_INDEX = 2;
+        // Dados começam na linha 4 (index 3)
         const DATA_START_INDEX = 3; 
+
+        // Safe header processing
         const headerRow = rows[HEADER_ROW_INDEX];
         if (!headerRow) {
              alert("Linha de cabeçalho (linha 3) não encontrada.");
              return;
         }
+
         const headers: string[] = [];
+        // Use loop to handle sparse arrays correctly
         for (let i = 0; i < headerRow.length; i++) {
             const val = headerRow[i];
             headers.push(val ? String(val).toLowerCase().trim() : '');
         }
+        
+        // Colunas essenciais
+        // Especificação do utilizador: Nome na coluna 3 (index 2 - considerando A=0, B=1, C=2)
         const nameIdx = 2;
+        
+        // Helper para encontrar colunas ignorando 2024 e preferindo 2025
         const findCol = (terms: string[]) => {
+            // 1. Tentar encontrar com termo E "2025"
             let idx = headers.findIndex(h => terms.some(t => h.includes(t)) && h.includes('2025'));
             if (idx !== -1) return idx;
+            
+            // 2. Tentar encontrar com termo MAS SEM "2024"
             idx = headers.findIndex(h => terms.some(t => h.includes(t)) && !h.includes('2024'));
             return idx;
         };
+
+        // Mapeamento opcional
         const birthDateIdx = findCol(['nascimento', 'data', 'birth']);
         const heightIdx = findCol(['altura', 'height']);
         const weightIdx = findCol(['peso', 'weight']);
         const posIdx = findCol(['posi', 'role']);
         const capsIdx = findCol(['caps', 'internacional']);
+
         let addedCount = 0;
+        
+        // Loop a começar na linha especificada
         for (let i = DATA_START_INDEX; i < rows.length; i++) {
             const row = rows[i];
             if (!row) continue;
+            
+            // Validar se existe nome na coluna especificada (coluna 3 -> index 2)
             const name = String(row[nameIdx] || '').trim();
             if (!name) continue;
+
+            // Date Parsing
             let birthDate = undefined;
             if (birthDateIdx !== -1) {
                 const rawDate = row[birthDateIdx];
+                // SheetJS por vezes retorna números para datas (Excel serial date)
                 if (typeof rawDate === 'string') {
+                    // Tentar formatos comuns DD/MM/YYYY ou YYYY-MM-DD
                     if (rawDate.includes('/')) {
                         const parts = rawDate.trim().split('/');
                         if (parts.length === 3) birthDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -1000,14 +1020,17 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                     }
                 }
             }
+
+            // Stats Parsing
             let finalHeight = undefined;
             if (heightIdx !== -1) {
                 const rawHeight = row[heightIdx];
                 if (rawHeight) {
                     const h = parseFloat(String(rawHeight).replace(',', '.'));
-                    if (!isNaN(h)) finalHeight = h < 3 ? h * 100 : h; 
+                    if (!isNaN(h)) finalHeight = h < 3 ? h * 100 : h; // Converter metros para cm
                 }
             }
+
             let finalWeight = undefined;
             if (weightIdx !== -1) {
                 const rawWeight = row[weightIdx];
@@ -1016,8 +1039,11 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                     if (!isNaN(w)) finalWeight = w;
                 }
             }
+
+            // Position Inference
             let position = Position.WING; 
             const posRaw = posIdx !== -1 ? (String(row[posIdx] || '')).toUpperCase() : '';
+            
             if (posRaw) {
                  if (posRaw.includes('PIL') || posRaw.includes('PROP')) position = Position.PROP;
                  else if (posRaw.includes('TAL') || posRaw.includes('HOOK')) position = Position.HOOKER;
@@ -1031,6 +1057,7 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                  else if (posRaw.includes('PONTA') || posRaw.includes('WING')) position = Position.WING;
                  else if (posRaw.includes('ARREIO') || posRaw.includes('FULL')) position = Position.FULLBACK;
             } else {
+                 // Heurística básica se não houver posição
                  const w = finalWeight || 75;
                  const h = finalHeight || 175;
                  if (w > 100) position = Position.PROP;
@@ -1038,7 +1065,9 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                  else if (w > 85) position = Position.FLANKER;
                  else position = Position.WING;
             }
+
             const caps = capsIdx !== -1 ? (parseInt(String(row[capsIdx] || '0')) || 0) : 0;
+
             addPlayer({
                 id: `import-${Date.now()}-${i}`,
                 name: name,
@@ -1051,6 +1080,7 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
             });
             addedCount++;
         }
+
         if (addedCount > 0) {
             alert(`${addedCount} jogadores importados com sucesso!`);
         } else {
@@ -1189,6 +1219,8 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
       </div>
     );
 };
+
+// --- Missing Views & Main App ---
 
 const TrainingView = ({ trainings, players, addTraining, updateTraining }: { trainings: TrainingSession[], players: Player[], addTraining: (t: TrainingSession) => void, updateTraining: (t: TrainingSession) => void }) => {
   const [isAdding, setIsAdding] = useState(false);
@@ -1465,8 +1497,10 @@ const AICoachView = () => {
 
     const initChat = () => {
         setApiKeyError(false);
+        // Tenta obter do localStorage primeiro
         let apiKey = localStorage.getItem('rugby_manager_api_key') || '';
         
+        // Se não houver no localStorage, usa a global (hardcoded no index.html)
         if (!apiKey && typeof window !== 'undefined' && (window as any).GEMINI_API_KEY) {
              apiKey = (window as any).GEMINI_API_KEY;
         }
@@ -1489,11 +1523,23 @@ const AICoachView = () => {
     };
 
     const handleSaveKey = () => {
+        if (!manualApiKey.trim()) return;
         localStorage.setItem('rugby_manager_api_key', manualApiKey);
         setShowSettings(false);
         setApiKeyError(false);
         setMessages(p => [...p, {role: 'model', text: '✅ Chave guardada. Tente enviar a mensagem novamente.'}]);
         initChat();
+    };
+
+    // Nova função para limpar a chave guardada e usar a padrão
+    const handleResetKey = () => {
+        localStorage.removeItem('rugby_manager_api_key');
+        setManualApiKey('');
+        setShowSettings(false);
+        setApiKeyError(false);
+        setMessages(p => [...p, {role: 'model', text: '🔄 Chave restaurada para a predefinição do sistema.'}]);
+        // Pequeno delay para garantir que o reset tenha efeito antes de re-inicializar
+        setTimeout(initChat, 100);
     };
 
     const send = async () => {
@@ -1557,16 +1603,21 @@ const AICoachView = () => {
                         A chave padrão expirou ou é inválida. Insira a sua chave pessoal para continuar.
                         <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-600 hover:underline ml-1">Obter chave aqui</a>.
                     </p>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-2">
                         <input 
                             type="password" 
                             value={manualApiKey}
                             onChange={(e) => setManualApiKey(e.target.value)}
                             className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm"
-                            placeholder="Cole aqui a sua API Key (começa por AIzaSy...)"
+                            placeholder="Cole aqui a sua API Key..."
                         />
                         <button onClick={handleSaveKey} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700">Guardar</button>
-                        <button onClick={() => { setShowSettings(false); setApiKeyError(false); }} className="text-slate-500 px-3 py-2 text-sm hover:bg-slate-100 rounded-md">Cancelar</button>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                        <button onClick={handleResetKey} className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1">
+                            <IconRefresh className="w-3 h-3" /> Restaurar Chave Padrão
+                        </button>
+                        <button onClick={() => { setShowSettings(false); setApiKeyError(false); }} className="text-slate-500 px-3 py-1 text-sm hover:bg-slate-100 rounded-md">Fechar</button>
                     </div>
                 </div>
             )}

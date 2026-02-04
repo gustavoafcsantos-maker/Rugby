@@ -1220,6 +1220,8 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
     );
 };
 
+// --- Missing Views & Main App ---
+
 const TrainingView = ({ trainings, players, addTraining, updateTraining }: { trainings: TrainingSession[], players: Player[], addTraining: (t: TrainingSession) => void, updateTraining: (t: TrainingSession) => void }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newDate, setNewDate] = useState('');
@@ -1483,6 +1485,9 @@ const AICoachView = () => {
     const [messages, setMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
+    const [manualApiKey, setManualApiKey] = useState('');
+    const [apiKeyError, setApiKeyError] = useState(false);
     const chatRef = useRef<any>(null);
 
     // Initial load
@@ -1491,11 +1496,22 @@ const AICoachView = () => {
     }, []);
 
     const initChat = () => {
-        // Guidelines: The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-        const apiKey = process.env.API_KEY;
+        setApiKeyError(false);
+        // Prioridade: LocalStorage > process.env
+        let apiKey = localStorage.getItem('rugby_manager_api_key') || '';
+        
+        // Safe access to process.env in browser environment
+        if (!apiKey && typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
+             apiKey = (window as any).process.env.API_KEY;
+        }
 
-        if (apiKey) {
+        if (apiKey && !apiKey.includes("COLE_A_SUA_CHAVE")) {
             try {
+                // Se o utilizador definiu uma chave manual, garantimos que também fica no process.env para os outros serviços
+                if (typeof window !== 'undefined' && (window as any).process && (window as any).process.env) {
+                    (window as any).process.env.API_KEY = apiKey;
+                }
+
                 const ai = new GoogleGenAI({ apiKey });
                 chatRef.current = ai.chats.create({ 
                     model: 'gemini-3-flash-preview', 
@@ -1506,8 +1522,26 @@ const AICoachView = () => {
                 setMessages(p => [...p, { role: 'model', text: '⚠️ Erro ao inicializar a IA. Verifique a consola.' }]);
             }
         } else {
-             setMessages([{ role: 'model', text: '⚠️ A chave da API não está configurada (process.env.API_KEY).' }]);
+             setMessages([{ role: 'model', text: '⚠️ A chave da API não está configurada. Use o ícone de configurações acima para inserir a sua chave.' }]);
         }
+    };
+
+    const handleSaveKey = () => {
+        if (!manualApiKey.trim()) return;
+        localStorage.setItem('rugby_manager_api_key', manualApiKey);
+        setShowSettings(false);
+        setApiKeyError(false);
+        setMessages(p => [...p, {role: 'model', text: '✅ Chave personalizada guardada.'}]);
+        initChat();
+    };
+
+    const handleResetKey = () => {
+        localStorage.removeItem('rugby_manager_api_key');
+        setManualApiKey('');
+        setShowSettings(false);
+        setApiKeyError(false);
+        setMessages(p => [...p, {role: 'model', text: '🔄 Chave restaurada para o padrão do sistema.'}]);
+        setTimeout(initChat, 100);
     };
 
     const send = async () => {
@@ -1516,10 +1550,12 @@ const AICoachView = () => {
         setInput('');
         setMessages(p => [...p, { role: 'user', text: msg }]);
         setLoading(true);
+        setApiKeyError(false);
         
         if (!chatRef.current) {
              initChat();
              if (!chatRef.current) {
+                 setApiKeyError(true);
                  setLoading(false);
                  return;
              }
@@ -1531,10 +1567,17 @@ const AICoachView = () => {
         } catch(e: any) {
             console.error("Chat Error:", e);
             let errorMsg = 'Desculpe, não consigo responder neste momento.';
+            if (e.message?.includes('API key') || e.status === 403) {
+                errorMsg += ' (A sua Chave API é inválida ou expirou)';
+                setApiKeyError(true);
+            }
+            else if (e.message?.includes('fetch')) errorMsg += ' (Erro de Ligação)';
             setMessages(p => [...p, { role: 'model', text: errorMsg }]);
         }
         setLoading(false);
     };
+
+    const hasCustomKey = !!localStorage.getItem('rugby_manager_api_key');
 
     return (
         <Card className="h-[calc(100vh-8rem)] flex flex-col p-0 overflow-hidden relative">
@@ -1543,7 +1586,59 @@ const AICoachView = () => {
                     <IconBrain className="w-5 h-5 text-indigo-600" />
                     Assistente Técnico AI
                 </h3>
+                <div className="flex items-center gap-2">
+                    {hasCustomKey && <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-100 flex items-center gap-1"><IconAlert className="w-3 h-3"/> Chave Manual</span>}
+                    <button 
+                        onClick={() => setShowSettings(!showSettings)}
+                        className={`p-2 rounded-full transition-colors ${showSettings || apiKeyError ? 'bg-indigo-100 text-indigo-600' : 'hover:bg-slate-200 text-slate-500'}`}
+                        title="Configurar Chave API"
+                    >
+                        <IconSettings className="w-5 h-5" />
+                    </button>
+                </div>
             </div>
+
+            {/* Settings Overlay */}
+            {(showSettings || apiKeyError) && (
+                <div className="absolute top-16 left-0 right-0 bg-white border-b border-slate-200 p-4 shadow-lg z-10 animate-in slide-in-from-top-2">
+                    <h4 className="font-bold text-sm text-slate-700 mb-2 flex items-center gap-2">
+                        {apiKeyError && <IconAlert className="w-4 h-4 text-red-500"/>}
+                        Configurar Chave API Google Gemini
+                    </h4>
+                    
+                    {hasCustomKey ? (
+                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 flex items-center justify-between">
+                            <div className="text-xs text-amber-800">
+                                <span className="font-bold">Aviso:</span> Está a usar uma chave manual.
+                            </div>
+                            <button onClick={handleResetKey} className="text-xs bg-white border border-amber-300 text-amber-800 px-3 py-1.5 rounded-md hover:bg-amber-100 font-medium flex items-center gap-1 shadow-sm">
+                                <IconRefresh className="w-3 h-3" /> Usar Padrão
+                            </button>
+                         </div>
+                    ) : (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                            <p className="text-xs text-green-800 flex items-center gap-2">
+                                <IconCheck className="w-3 h-3"/> Está a usar a Chave de Sistema Padrão.
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="border-t border-slate-100 pt-3">
+                        <p className="text-xs font-medium text-slate-700 mb-1">Inserir Nova Chave Manualmente:</p>
+                        <div className="flex gap-2">
+                            <input 
+                                type="password" 
+                                value={manualApiKey}
+                                onChange={(e) => setManualApiKey(e.target.value)}
+                                className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm"
+                                placeholder="AIzaSy..."
+                            />
+                            <button onClick={handleSaveKey} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700">Guardar</button>
+                            <button onClick={() => { setShowSettings(false); setApiKeyError(false); }} className="text-slate-500 px-3 py-2 text-sm hover:bg-slate-100 rounded-md">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="flex-1 overflow-y-auto space-y-4 p-4">
                 {messages.length === 0 && (
@@ -1570,8 +1665,9 @@ const AICoachView = () => {
                     onKeyDown={e => e.key === 'Enter' && send()}
                     className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Escreve uma mensagem..."
+                    disabled={apiKeyError}
                 />
-                <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled={loading}>
+                <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled={loading || apiKeyError}>
                     Enviar
                 </button>
             </div>

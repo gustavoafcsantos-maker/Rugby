@@ -7,80 +7,55 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
-        // Global error handler para apanhar erros de módulos antes do React iniciar
+      // --- CONFIGURAÇÃO DA GOOGLE GEMINI API ---
+      var CHAVE_DO_UTILIZADOR = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
+      
+      if (CHAVE_DO_UTILIZADOR) {
+          CHAVE_DO_UTILIZADOR = CHAVE_DO_UTILIZADOR.trim();
+          window.GEMINI_API_KEY = CHAVE_DO_UTILIZADOR;
+          
+          window.process = window.process || {};
+          window.process.env = window.process.env || {};
+          window.process.env.API_KEY = CHAVE_DO_UTILIZADOR;
+      }
+    </script>
+    <script>
+        // Global error handler
         window.addEventListener('error', function(e) {
             const root = document.getElementById('root');
-            // Ignorar erros de ResizeObserver que são benignos mas comuns
             if (e.message && e.message.includes('ResizeObserver')) return;
             
             if (root && (e.message || e.error)) {
                 console.error("Erro Global:", e);
-                root.innerHTML = `<div style="color: #ef4444; padding: 2rem; font-family: sans-serif; text-align: center; max-width: 600px; margin: 0 auto;">
-                    <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">Erro ao Iniciar Aplicação</h2>
-                    <div style="background: #fee2e2; padding: 1rem; border-radius: 0.5rem; text-align: left; overflow: auto; margin-bottom: 1rem; border: 1px solid #fca5a5;">
-                        <p style="font-family: monospace; font-size: 0.9rem; margin: 0;">${e.message || String(e.error)}</p>
-                    </div>
-                    <p style="color: #64748b; margin-bottom: 1rem;">Isto pode dever-se a um conflito de versões ou erro de rede.</p>
-                    <button onclick="window.location.reload()" style="background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.25rem; cursor: pointer; font-weight: 500;">Tentar Novamente</button>
-                </div>`;
+                // Só mostra erro se o React ainda não tiver montado (root vazio ou com spinner)
+                if (root.innerHTML.includes('animate-spin')) {
+                    root.innerHTML = `<div style="color: #ef4444; padding: 2rem; font-family: sans-serif; text-align: center;">
+                        <h2>Erro ao Iniciar</h2>
+                        <p>${e.message || String(e.error)}</p>
+                        <button onclick="window.location.reload()" style="margin-top:10px; padding:5px 10px; cursor:pointer">Tentar Novamente</button>
+                    </div>`;
+                }
             }
         });
     </script>
-    <script>
-      // --- CONFIGURAÇÃO DA GOOGLE GEMINI API ---
-      
-      // CHAVE: Atualizada pelo utilizador
-      var CHAVE_DO_UTILIZADOR = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
-      
-      // --------------------------------------------------------
-      // Lógica de injeção (Não mexer daqui para baixo)
-      // --------------------------------------------------------
-      if (CHAVE_DO_UTILIZADOR) {
-          CHAVE_DO_UTILIZADOR = CHAVE_DO_UTILIZADOR.trim();
-      }
-      
-      // Colocamos numa variável global direta para garantir acesso
-      window.GEMINI_API_KEY = CHAVE_DO_UTILIZADOR;
-      
-      // Fallback para compatibilidade com process.env
-      window.process = window.process || {};
-      window.process.env = window.process.env || {};
-      
-      if (CHAVE_DO_UTILIZADOR) {
-          window.process.env.API_KEY = CHAVE_DO_UTILIZADOR;
-      }
-    </script>
     <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        background-color: #f1f5f9;
-      }
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #f1f5f9; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
-      }
+      body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #f1f5f9; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
     "@google/genai": "https://esm.sh/@google/genai@0.2.1",
     "firebase/app": "https://esm.sh/firebase@10.13.1/app",
     "firebase/firestore": "https://esm.sh/firebase@10.13.1/firestore?deps=firebase@10.13.1",
+    "react": "https://esm.sh/react@18.3.1",
     "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1",
     "react-dom": "https://esm.sh/react-dom@18.3.1?deps=react@18.3.1",
-    "react-markdown": "https://esm.sh/react-markdown@9.0.1?deps=react@18.3.1,react-dom@18.3.1",
-    "react": "https://esm.sh/react@18.3.1",
     "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "react-markdown": "https://esm.sh/react-markdown@9.0.1?deps=react@18.3.1,react-dom@18.3.1",
     "lucide-react": "https://esm.sh/lucide-react@0.441.0?deps=react@18.3.1",
     "recharts": "https://esm.sh/recharts@2.12.7?deps=react@18.3.1,react-dom@18.3.1",
     "xlsx": "https://esm.sh/xlsx@0.18.5",
@@ -89,7 +64,7 @@
   }
 }
 </script>
-</head>
+  </head>
   <body>
     <div id="root">
         <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; color: #64748b; gap: 1rem;">

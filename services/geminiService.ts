@@ -2,6 +2,8 @@ import { GoogleGenAI } from "@google/genai";
 import { Player, Position, Match, TrainingSession } from '../types';
 
 const MODEL_NAME = 'gemini-3-flash-preview';
+const BAD_KEY = 'AIzaSyBMBM1TYgs3YrFmffEExDZ2gB3JWK2H90o'; // Chave incorreta que pode ter ficado em cache
+const DEFAULT_KEY = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
 
 // Helper para obter a chave de forma segura e hierárquica
 const getAIClient = () => {
@@ -10,7 +12,10 @@ const getAIClient = () => {
   // 1. Prioridade Máxima: Chave definida manualmente pelo utilizador (guardada no browser)
   if (typeof window !== 'undefined') {
       const storedKey = localStorage.getItem('rugby_manager_api_key');
-      if (storedKey) apiKey = storedKey;
+      // Proteção: Se a chave guardada for a "má" (do firebase), ignoramos e forçamos o default
+      if (storedKey && storedKey !== BAD_KEY) {
+          apiKey = storedKey;
+      }
   }
 
   // 2. Prioridade Média: Variável de Ambiente (Node/Build)
@@ -25,7 +30,7 @@ const getAIClient = () => {
 
   // 4. Fallback de segurança (Chave Hardcoded)
   if (!apiKey) {
-      apiKey = "AIzaSyBMBM1TYgs3YrFmffEExDZ2gB3JWK2H90o";
+      apiKey = DEFAULT_KEY;
   }
 
   return new GoogleGenAI({ apiKey: apiKey });

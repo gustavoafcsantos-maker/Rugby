@@ -74,6 +74,12 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
         }, 1000);
     };
 
+    const handleReset = () => {
+        localStorage.removeItem('rugby_manager_api_key');
+        setManualApiKey('');
+        alert("A chave foi reposta para o padrão do sistema. Clique em 'Guardar' para aplicar.");
+    };
+
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
@@ -88,13 +94,18 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Google Gemini API Key</label>
-                        <input 
-                            type="password" 
-                            value={manualApiKey}
-                            onChange={(e) => setManualApiKey(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                            placeholder="Deixe vazio para usar a chave do sistema"
-                        />
+                        <div className="flex gap-2">
+                            <input 
+                                type="password" 
+                                value={manualApiKey}
+                                onChange={(e) => setManualApiKey(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                placeholder="Padrão do Sistema (Automático)"
+                            />
+                            <button onClick={handleReset} className="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 text-xs font-medium whitespace-nowrap" title="Usar chave padrão">
+                                Repor Padrão
+                            </button>
+                        </div>
                         <p className="text-xs text-slate-500 mt-2">
                             Esta chave será usada para o <strong>AI Coach</strong>, <strong>Planos de Treino</strong> e <strong>Estratégias de Jogo</strong>.
                             <br/>
@@ -1522,7 +1533,7 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
                                     </p>
                                     <p className="text-xs text-slate-400">XV Inicial</p>
                                 </div>
-                                <IconChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 ml-4" />
+                                <IconChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-50 ml-4" />
                             </div>
                         </div>
                     </Card>
@@ -1552,15 +1563,23 @@ const AICoachView = ({ onOpenSettings }: { onOpenSettings: () => void }) => {
 
     const initChat = () => {
         setApiKeyError(false);
-        // Prioridade: LocalStorage > process.env > window.GEMINI_API_KEY > fallback hardcoded
+        const BAD_KEY = 'AIzaSyBMBM1TYgs3YrFmffEExDZ2gB3JWK2H90o';
+        
         let apiKey = localStorage.getItem('rugby_manager_api_key') || '';
         
+        // Safety check: Ignore known bad keys
+        if (apiKey === BAD_KEY) {
+            console.warn("Chave inválida detetada no armazenamento, ignorando...");
+            apiKey = '';
+        }
+
+        // Prioridade: LocalStorage > process.env > window.GEMINI_API_KEY > fallback hardcoded
         if (!apiKey && typeof window !== 'undefined') {
              // Tentar obter da variável global injetada
              apiKey = (window as any).GEMINI_API_KEY || (window as any).process?.env?.API_KEY;
         }
 
-        if (!apiKey) apiKey = "AIzaSyBMBM1TYgs3YrFmffEExDZ2gB3JWK2H90o";
+        if (!apiKey) apiKey = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
 
         try {
             const ai = new GoogleGenAI({ apiKey });
@@ -1722,6 +1741,18 @@ const App = () => {
   const [syncStatus, setSyncStatus] = useState<string>('offline');
   const [syncError, setSyncError] = useState<string>('');
   const isRemoteUpdate = useRef(false);
+
+  // --- AUTO-FIX BAD KEY ---
+  useEffect(() => {
+    const badKey = 'AIzaSyBMBM1TYgs3YrFmffEExDZ2gB3JWK2H90o';
+    const currentKey = localStorage.getItem('rugby_manager_api_key');
+    if (currentKey === badKey) {
+        console.log("A corrigir chave de API incorreta (Auto-Fix)...");
+        localStorage.removeItem('rugby_manager_api_key');
+        // Pequeno delay para garantir que o utilizador vê a correção se necessário, mas um reload é melhor
+        window.location.reload();
+    }
+  }, []);
 
   // --- LOCAL PERSISTENCE ---
   useEffect(() => { saveState('rugby_manager_players', players); }, [players]);

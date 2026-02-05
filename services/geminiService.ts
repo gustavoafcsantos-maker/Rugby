@@ -25,7 +25,7 @@ const getAIClient = () => {
 
   // 4. Fallback de segurança (Chave Hardcoded)
   if (!apiKey) {
-      apiKey = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
+      apiKey = "AIzaSyBMBM1TYgs3YrFmffEExDZ2gB3JWK2H90o";
   }
 
   return new GoogleGenAI({ apiKey: apiKey });

@@ -1560,7 +1560,7 @@ const AICoachView = ({ onOpenSettings }: { onOpenSettings: () => void }) => {
              apiKey = (window as any).GEMINI_API_KEY || (window as any).process?.env?.API_KEY;
         }
 
-        if (!apiKey) apiKey = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
+        if (!apiKey) apiKey = "AIzaSyBMBM1TYgs3YrFmffEExDZ2gB3JWK2H90o";
 
         try {
             const ai = new GoogleGenAI({ apiKey });

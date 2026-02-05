@@ -3,16 +3,27 @@ import { Player, Position, Match, TrainingSession } from '../types';
 
 const MODEL_NAME = 'gemini-3-flash-preview';
 
-// Helper para obter a chave de forma segura
+// Helper para obter a chave de forma segura e hierárquica
 const getAIClient = () => {
-  let apiKey = process.env.API_KEY;
+  let apiKey = '';
+
+  // 1. Prioridade Máxima: Chave definida manualmente pelo utilizador (guardada no browser)
+  if (typeof window !== 'undefined') {
+      const storedKey = localStorage.getItem('rugby_manager_api_key');
+      if (storedKey) apiKey = storedKey;
+  }
+
+  // 2. Prioridade Média: Variável de Ambiente (Node/Build)
+  if (!apiKey && process.env.API_KEY) {
+      apiKey = process.env.API_KEY;
+  }
   
-  // Fallback para ambiente de browser onde process.env pode não estar definido
+  // 3. Prioridade Baixa: Variável Global Injetada (Browser)
   if (!apiKey && typeof window !== 'undefined') {
     apiKey = (window as any).GEMINI_API_KEY || (window as any).process?.env?.API_KEY;
   }
 
-  // Fallback de segurança para a chave fornecida explicitamente pelo utilizador
+  // 4. Fallback de segurança (Chave Hardcoded)
   if (!apiKey) {
       apiKey = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
   }
@@ -51,7 +62,7 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico. Verifique se a chave de API está correta.";
+    return "Erro ao contactar o assistente técnico. Verifique se a chave de API está correta nas definições.";
   }
 };
 
@@ -92,6 +103,6 @@ export const generateMatchStrategy = async (
     return response.text || "Não foi possível gerar a estratégia.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico.";
+    return "Erro ao contactar o assistente técnico. Verifique as definições da API Key.";
   }
 };

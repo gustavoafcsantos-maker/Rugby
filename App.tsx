@@ -57,6 +57,67 @@ const saveState = <T,>(key: string, data: T) => {
 
 // --- Modals ---
 
+const SettingsModal = ({ onClose }: { onClose: () => void }) => {
+    const [manualApiKey, setManualApiKey] = useState(localStorage.getItem('rugby_manager_api_key') || '');
+    const [saved, setSaved] = useState(false);
+
+    const handleSave = () => {
+        if (!manualApiKey.trim()) {
+            localStorage.removeItem('rugby_manager_api_key');
+        } else {
+            localStorage.setItem('rugby_manager_api_key', manualApiKey.trim());
+        }
+        setSaved(true);
+        setTimeout(() => {
+            setSaved(false);
+            window.location.reload(); // Recarregar para aplicar a nova chave em todo o lado
+        }, 1000);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <IconSettings className="w-6 h-6 text-slate-500" />
+                        Definições Globais
+                    </h3>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><IconX className="w-5 h-5 text-slate-400" /></button>
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Google Gemini API Key</label>
+                        <input 
+                            type="password" 
+                            value={manualApiKey}
+                            onChange={(e) => setManualApiKey(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                            placeholder="Deixe vazio para usar a chave do sistema"
+                        />
+                        <p className="text-xs text-slate-500 mt-2">
+                            Esta chave será usada para o <strong>AI Coach</strong>, <strong>Planos de Treino</strong> e <strong>Estratégias de Jogo</strong>.
+                            <br/>
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">Obter chave gratuita no Google AI Studio</a>
+                        </p>
+                    </div>
+
+                    {saved && (
+                        <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm flex items-center gap-2">
+                            <IconCheck className="w-4 h-4" /> Configuração guardada! A recarregar...
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+                        <button onClick={onClose} className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium">Cancelar</button>
+                        <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-medium shadow-sm">Guardar Alterações</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const PlayerDetailsModal = ({ 
   player, 
   trainings,
@@ -343,7 +404,6 @@ const PlayerDetailsModal = ({
   );
 };
 
-// --- Training Details Modal ---
 const TrainingDetailsModal = ({ 
     training, 
     players, 
@@ -473,7 +533,6 @@ const TrainingDetailsModal = ({
     );
 };
 
-// --- Match Details Modal ---
 const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, players: Player[], onClose: () => void, onSave: (m: Match) => void }) => {
     const [activeTab, setActiveTab] = useState<'selection' | 'lineup' | 'strategy'>('selection');
     const [localMatch, setLocalMatch] = useState<Match>(match);
@@ -1220,8 +1279,6 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
     );
 };
 
-// --- Missing Views & Main App ---
-
 const TrainingView = ({ trainings, players, addTraining, updateTraining }: { trainings: TrainingSession[], players: Player[], addTraining: (t: TrainingSession) => void, updateTraining: (t: TrainingSession) => void }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newDate, setNewDate] = useState('');
@@ -1481,12 +1538,10 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
     );
 };
 
-const AICoachView = () => {
+const AICoachView = ({ onOpenSettings }: { onOpenSettings: () => void }) => {
     const [messages, setMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
-    const [showSettings, setShowSettings] = useState(false);
-    const [manualApiKey, setManualApiKey] = useState('');
     const [apiKeyError, setApiKeyError] = useState(false);
     const chatRef = useRef<any>(null);
 
@@ -1505,43 +1560,18 @@ const AICoachView = () => {
              apiKey = (window as any).GEMINI_API_KEY || (window as any).process?.env?.API_KEY;
         }
 
-        // Fallback final para a chave fornecida pelo utilizador
-        if (!apiKey) {
-            apiKey = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
+        if (!apiKey) apiKey = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
+
+        try {
+            const ai = new GoogleGenAI({ apiKey });
+            chatRef.current = ai.chats.create({ 
+                model: 'gemini-3-flash-preview', 
+                config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
+            });
+        } catch (e) {
+            console.error("Erro ao iniciar chat", e);
+            setMessages(p => [...p, { role: 'model', text: '⚠️ Erro ao inicializar a IA. Verifique a consola.' }]);
         }
-
-        if (apiKey && !apiKey.includes("COLE_A_SUA_CHAVE")) {
-            try {
-                const ai = new GoogleGenAI({ apiKey });
-                chatRef.current = ai.chats.create({ 
-                    model: 'gemini-3-flash-preview', 
-                    config: { systemInstruction: 'És um treinador de rugby experiente. Ajuda com táticas, exercícios e gestão de equipa.' } 
-                });
-            } catch (e) {
-                console.error("Erro ao iniciar chat", e);
-                setMessages(p => [...p, { role: 'model', text: '⚠️ Erro ao inicializar a IA. Verifique a consola.' }]);
-            }
-        } else {
-             setMessages([{ role: 'model', text: '⚠️ A chave da API não está configurada. Use o ícone de configurações acima para inserir a sua chave.' }]);
-        }
-    };
-
-    const handleSaveKey = () => {
-        if (!manualApiKey.trim()) return;
-        localStorage.setItem('rugby_manager_api_key', manualApiKey);
-        setShowSettings(false);
-        setApiKeyError(false);
-        setMessages(p => [...p, {role: 'model', text: '✅ Chave personalizada guardada.'}]);
-        initChat();
-    };
-
-    const handleResetKey = () => {
-        localStorage.removeItem('rugby_manager_api_key');
-        setManualApiKey('');
-        setShowSettings(false);
-        setApiKeyError(false);
-        setMessages(p => [...p, {role: 'model', text: '🔄 Chave restaurada para o padrão do sistema.'}]);
-        setTimeout(initChat, 100);
     };
 
     const send = async () => {
@@ -1552,14 +1582,7 @@ const AICoachView = () => {
         setLoading(true);
         setApiKeyError(false);
         
-        if (!chatRef.current) {
-             initChat();
-             if (!chatRef.current) {
-                 setApiKeyError(true);
-                 setLoading(false);
-                 return;
-             }
-        }
+        if (!chatRef.current) initChat();
 
         try {
             const res = await chatRef.current.sendMessage({ message: msg });
@@ -1568,7 +1591,7 @@ const AICoachView = () => {
             console.error("Chat Error:", e);
             let errorMsg = 'Desculpe, não consigo responder neste momento.';
             if (e.message?.includes('API key') || e.status === 403) {
-                errorMsg += ' (A sua Chave API é inválida ou expirou)';
+                errorMsg += ' (Chave API inválida)';
                 setApiKeyError(true);
             }
             else if (e.message?.includes('fetch')) errorMsg += ' (Erro de Ligação)';
@@ -1577,8 +1600,6 @@ const AICoachView = () => {
         setLoading(false);
     };
 
-    const hasCustomKey = !!localStorage.getItem('rugby_manager_api_key');
-
     return (
         <Card className="h-[calc(100vh-8rem)] flex flex-col p-0 overflow-hidden relative">
             <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
@@ -1586,57 +1607,20 @@ const AICoachView = () => {
                     <IconBrain className="w-5 h-5 text-indigo-600" />
                     Assistente Técnico AI
                 </h3>
-                <div className="flex items-center gap-2">
-                    {hasCustomKey && <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-100 flex items-center gap-1"><IconAlert className="w-3 h-3"/> Chave Manual</span>}
-                    <button 
-                        onClick={() => setShowSettings(!showSettings)}
-                        className={`p-2 rounded-full transition-colors ${showSettings || apiKeyError ? 'bg-indigo-100 text-indigo-600' : 'hover:bg-slate-200 text-slate-500'}`}
-                        title="Configurar Chave API"
-                    >
-                        <IconSettings className="w-5 h-5" />
-                    </button>
-                </div>
+                <button onClick={onOpenSettings} className="text-sm text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
+                    <IconSettings className="w-4 h-4"/> Configurar Chave
+                </button>
             </div>
 
-            {/* Settings Overlay */}
-            {(showSettings || apiKeyError) && (
-                <div className="absolute top-16 left-0 right-0 bg-white border-b border-slate-200 p-4 shadow-lg z-10 animate-in slide-in-from-top-2">
-                    <h4 className="font-bold text-sm text-slate-700 mb-2 flex items-center gap-2">
-                        {apiKeyError && <IconAlert className="w-4 h-4 text-red-500"/>}
-                        Configurar Chave API Google Gemini
-                    </h4>
-                    
-                    {hasCustomKey ? (
-                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 flex items-center justify-between">
-                            <div className="text-xs text-amber-800">
-                                <span className="font-bold">Aviso:</span> Está a usar uma chave manual.
-                            </div>
-                            <button onClick={handleResetKey} className="text-xs bg-white border border-amber-300 text-amber-800 px-3 py-1.5 rounded-md hover:bg-amber-100 font-medium flex items-center gap-1 shadow-sm">
-                                <IconRefresh className="w-3 h-3" /> Usar Padrão
-                            </button>
-                         </div>
-                    ) : (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                            <p className="text-xs text-green-800 flex items-center gap-2">
-                                <IconCheck className="w-3 h-3"/> Está a usar a Chave de Sistema Padrão.
-                            </p>
-                        </div>
-                    )}
-
-                    <div className="border-t border-slate-100 pt-3">
-                        <p className="text-xs font-medium text-slate-700 mb-1">Inserir Nova Chave Manualmente:</p>
-                        <div className="flex gap-2">
-                            <input 
-                                type="password" 
-                                value={manualApiKey}
-                                onChange={(e) => setManualApiKey(e.target.value)}
-                                className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm"
-                                placeholder="AIzaSy..."
-                            />
-                            <button onClick={handleSaveKey} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700">Guardar</button>
-                            <button onClick={() => { setShowSettings(false); setApiKeyError(false); }} className="text-slate-500 px-3 py-2 text-sm hover:bg-slate-100 rounded-md">Fechar</button>
-                        </div>
+            {apiKeyError && (
+                <div className="bg-red-50 p-3 border-b border-red-100 flex justify-between items-center animate-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 text-red-700 text-sm">
+                        <IconAlert className="w-4 h-4" />
+                        <span>A chave de API expirou ou é inválida.</span>
                     </div>
+                    <button onClick={onOpenSettings} className="text-xs bg-white border border-red-200 text-red-700 px-3 py-1.5 rounded-md hover:bg-red-50 font-medium shadow-sm">
+                        Corrigir Agora
+                    </button>
                 </div>
             )}
 
@@ -1675,7 +1659,7 @@ const AICoachView = () => {
     );
 };
 
-const Sidebar = ({ view, setView, syncStatus }: { view: ViewState, setView: (v: ViewState) => void, syncStatus: string }) => {
+const Sidebar = ({ view, setView, syncStatus, onOpenSettings }: { view: ViewState, setView: (v: ViewState) => void, syncStatus: string, onOpenSettings: () => void }) => {
   const menuItems: { id: ViewState, label: string, icon: React.FC<any> }[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: IconDashboard },
     { id: 'ROSTER', label: 'Plantel', icon: IconUsers },
@@ -1705,9 +1689,13 @@ const Sidebar = ({ view, setView, syncStatus }: { view: ViewState, setView: (v: 
           </button>
         ))}
       </nav>
-      <div className="p-6 border-t border-slate-800">
+      <div className="p-6 border-t border-slate-800 space-y-4">
+        <button onClick={onOpenSettings} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition-colors text-sm">
+            <IconSettings className="w-5 h-5 text-slate-400" />
+            <span>Definições Globais</span>
+        </button>
         <div className="flex items-center gap-2 text-xs font-medium">
-             {syncStatus === 'synced' && <><span className="w-2 h-2 rounded-full bg-green-500"></span> Online (Sincronizado)</>}
+             {syncStatus === 'synced' && <><span className="w-2 h-2 rounded-full bg-green-500"></span> Online</>}
              {syncStatus === 'saving' && <><span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> A Gravar...</>}
              {syncStatus === 'offline' && <><span className="w-2 h-2 rounded-full bg-slate-500"></span> Offline</>}
              {syncStatus === 'error' && <><span className="w-2 h-2 rounded-full bg-red-500"></span> Erro Ligação</>}
@@ -1719,6 +1707,7 @@ const Sidebar = ({ view, setView, syncStatus }: { view: ViewState, setView: (v: 
 
 const App = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
+  const [showSettings, setShowSettings] = useState(false);
   
   // --- STATE INITIALIZATION ---
   const [players, setPlayers] = useState<Player[]>(() => loadState('rugby_manager_players', INITIAL_PLAYERS));
@@ -1727,8 +1716,8 @@ const App = () => {
   
   // --- SYNC CONFIG ---
   const [firebaseConfig, setFirebaseConfig] = useState({ 
-    apiKey: localStorage.getItem('firebase_api_key') || '', 
-    projectId: localStorage.getItem('firebase_project_id') || '' 
+    apiKey: localStorage.getItem('firebase_api_key') || 'AIzaSyBMBM1TYgs3YrFmffEExDZ2gB3JWK2H90o', 
+    projectId: localStorage.getItem('firebase_project_id') || 'rugbymanager-7cdf6' 
   });
   const [syncStatus, setSyncStatus] = useState<string>('offline');
   const [syncError, setSyncError] = useState<string>('');
@@ -1756,13 +1745,8 @@ const App = () => {
             doc(db, "backups", "rugby_manager_data"), 
             (docSnapshot) => {
                 const source = docSnapshot.metadata.hasPendingWrites ? "Local" : "Server";
-                
-                // If the update is local (optimistic UI), ignore to prevent loops
-                // If it's from server, update local state
                 if (source === "Server" && docSnapshot.exists()) {
-                    console.log("Recebendo atualização do servidor...");
                     const data = docSnapshot.data();
-                    
                     isRemoteUpdate.current = true; // Flag to prevent echoing back
                     if(data.players) setPlayers(data.players);
                     if(data.trainings) setTrainings(data.trainings);
@@ -1791,8 +1775,6 @@ const App = () => {
   // --- FIREBASE SYNC: AUTOSAVE (WRITE) ---
   useEffect(() => {
     if (!firebaseConfig.apiKey || !firebaseConfig.projectId) return;
-
-    // If this change came from the server, simply reset flag and do NOT save back
     if (isRemoteUpdate.current) {
         isRemoteUpdate.current = false;
         return;
@@ -1804,7 +1786,6 @@ const App = () => {
         try {
             const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
             const db = getFirestore(app);
-            
             await setDoc(doc(db, "backups", "rugby_manager_data"), {
                 players,
                 trainings,
@@ -1834,16 +1815,24 @@ const App = () => {
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
-      <Sidebar view={view} setView={setView} syncStatus={syncStatus} />
+      <Sidebar view={view} setView={setView} syncStatus={syncStatus} onOpenSettings={() => setShowSettings(true)} />
+      
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+
       <main className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto min-h-full">
             {/* Mobile Header */}
             <div className="md:hidden mb-4 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
                  <h1 className="font-bold text-slate-800">Rugby Manager</h1>
+                 <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500"><IconSettings className="w-5 h-5"/></button>
+            </div>
+            
+            {/* Mobile View Selector */}
+            <div className="md:hidden mb-4 bg-white p-2 rounded-lg shadow-sm">
                  <select 
                     value={view} 
                     onChange={(e) => setView(e.target.value as ViewState)}
-                    className="bg-slate-100 border-none rounded-md px-2 py-1 text-sm"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm"
                  >
                      <option value="DASHBOARD">Dashboard</option>
                      <option value="ROSTER">Plantel</option>
@@ -1858,7 +1847,7 @@ const App = () => {
           {view === 'ROSTER' && <RosterView players={players} trainings={trainings} matches={matches} addPlayer={addPlayer} removePlayer={removePlayer} updatePlayer={updatePlayer} />}
           {view === 'TRAINING' && <TrainingView trainings={trainings} players={players} addTraining={addTraining} updateTraining={updateTraining} />}
           {view === 'MATCHES' && <MatchesView matches={matches} players={players} addMatch={addMatch} updateMatch={updateMatch} />}
-          {view === 'AI_COACH' && <AICoachView />}
+          {view === 'AI_COACH' && <AICoachView onOpenSettings={() => setShowSettings(true)} />}
           {view === 'DATA' && <DatabaseView config={firebaseConfig} setConfig={setFirebaseConfig} syncStatus={syncStatus} errorMessage={syncError} />}
         </div>
       </main>

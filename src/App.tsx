@@ -1,2 +1,2 @@
-// Redireciona para a aplicação principal na raiz
-export { default } from '../App';
+// This file is unused. The main App is in the root directory.
+export default function Placeholder() { return null; }

@@ -84,7 +84,7 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <h3 className="text-xl font-bold text-blue-950 flex items-center gap-2">
                         <IconSettings className="w-6 h-6 text-slate-500" />
                         Definições Globais
                     </h3>
@@ -99,7 +99,7 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
                                 type="password" 
                                 value={manualApiKey}
                                 onChange={(e) => setManualApiKey(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none"
                                 placeholder="Padrão do Sistema (Automático)"
                             />
                             <button onClick={handleReset} className="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 text-xs font-medium whitespace-nowrap" title="Usar chave padrão">
@@ -109,7 +109,7 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
                         <p className="text-xs text-slate-500 mt-2">
                             Esta chave será usada para o <strong>AI Coach</strong>, <strong>Planos de Treino</strong> e <strong>Estratégias de Jogo</strong>.
                             <br/>
-                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">Obter chave gratuita no Google AI Studio</a>
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">Obter chave gratuita no Google AI Studio</a>
                         </p>
                     </div>
 
@@ -121,7 +121,7 @@ const SettingsModal = ({ onClose }: { onClose: () => void }) => {
 
                     <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
                         <button onClick={onClose} className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium">Cancelar</button>
-                        <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-medium shadow-sm">Guardar Alterações</button>
+                        <button onClick={handleSave} className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium shadow-sm">Guardar Alterações</button>
                     </div>
                 </div>
             </div>
@@ -193,7 +193,7 @@ const PlayerDetailsModal = ({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="bg-slate-900 p-6 flex justify-between items-center text-white shrink-0">
+        <div className="bg-blue-950 p-6 flex justify-between items-center text-white shrink-0">
           <div>
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <IconUsers className="w-5 h-5" />
@@ -210,13 +210,13 @@ const PlayerDetailsModal = ({
         <div className="flex border-b border-slate-200 shrink-0">
             <button 
                 onClick={() => setActiveTab('details')}
-                className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'details' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'details' ? 'text-red-600 border-b-2 border-red-600 bg-red-50/50' : 'text-slate-500 hover:text-slate-700'}`}
             >
                 Dados Pessoais
             </button>
             <button 
                 onClick={() => setActiveTab('stats')}
-                className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'stats' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'stats' ? 'text-red-600 border-b-2 border-red-600 bg-red-50/50' : 'text-slate-500 hover:text-slate-700'}`}
             >
                 Estatísticas & Performance
             </button>
@@ -232,7 +232,7 @@ const PlayerDetailsModal = ({
                     name="name" 
                     value={formData.name} 
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     required
                 />
                 </div>
@@ -243,7 +243,7 @@ const PlayerDetailsModal = ({
                     name="position" 
                     value={formData.position} 
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 >
                     {(Object.values(Position) as string[]).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
@@ -255,7 +255,7 @@ const PlayerDetailsModal = ({
                     name="status" 
                     value={formData.status} 
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 >
                     {(Object.values(PlayerStatus) as string[]).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
@@ -268,7 +268,7 @@ const PlayerDetailsModal = ({
                     name="birthDate" 
                     value={formData.birthDate || ''} 
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
                 </div>
 
@@ -279,7 +279,7 @@ const PlayerDetailsModal = ({
                     name="locality" 
                     value={formData.locality || ''} 
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     placeholder="Ex: Lisboa"
                 />
                 </div>
@@ -291,7 +291,7 @@ const PlayerDetailsModal = ({
                     name="height" 
                     value={formData.height || ''} 
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     placeholder="Ex: 185"
                 />
                 </div>
@@ -303,7 +303,7 @@ const PlayerDetailsModal = ({
                     name="weight" 
                     value={formData.weight || ''} 
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     placeholder="Ex: 95"
                 />
                 </div>
@@ -315,7 +315,7 @@ const PlayerDetailsModal = ({
                     name="caps" 
                     value={formData.caps} 
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
                 </div>
             </div>
@@ -324,7 +324,7 @@ const PlayerDetailsModal = ({
                 <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">
                 Cancelar
                 </button>
-                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+                <button type="submit" className="px-5 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm">
                 Guardar Alterações
                 </button>
             </div>
@@ -338,10 +338,10 @@ const PlayerDetailsModal = ({
                         <p className="text-3xl font-bold text-emerald-700 mt-1">{attendanceRate}%</p>
                         <p className="text-xs text-emerald-600 mt-1">{presentCount} em {totalTrainings} treinos</p>
                     </div>
-                     <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                        <p className="text-indigo-800 text-sm font-medium flex items-center gap-2"><IconClock className="w-4 h-4"/> Minutos (Época)</p>
-                        <p className="text-3xl font-bold text-indigo-700 mt-1">{totalMinutes}'</p>
-                        <p className="text-xs text-indigo-600 mt-1">{starts} Titular / {subApps} Suplente</p>
+                     <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                        <p className="text-blue-900 text-sm font-medium flex items-center gap-2"><IconClock className="w-4 h-4"/> Minutos (Época)</p>
+                        <p className="text-3xl font-bold text-blue-800 mt-1">{totalMinutes}'</p>
+                        <p className="text-xs text-blue-700 mt-1">{starts} Titular / {subApps} Suplente</p>
                     </div>
                      <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
                         <p className="text-orange-800 text-sm font-medium flex items-center gap-2"><IconTrophy className="w-4 h-4"/> Convocatórias</p>
@@ -401,7 +401,7 @@ const PlayerDetailsModal = ({
                                 <span className="text-slate-600 font-medium">Indisponível</span>
                                 <span className="font-bold text-amber-600">{notSelectedReasons[MatchSelectionStatus.UNAVAILABLE] || 0} Jogos</span>
                             </div>
-                            <div className="mt-6 p-4 bg-blue-50 rounded-xl text-xs text-blue-800">
+                            <div className="mt-6 p-4 bg-blue-50 rounded-xl text-xs text-blue-900">
                                 <p><strong>Nota do Treinador AI:</strong> {attendanceRate > 80 ? 'Excelente assiduidade. Jogador comprometido.' : 'Assiduidade abaixo do ideal, verificar motivos.'}</p>
                             </div>
                          </div>
@@ -452,10 +452,10 @@ const TrainingDetailsModal = ({
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
              <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
+                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-blue-50 rounded-t-xl">
                      <div>
                          <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <IconCalendar className="w-5 h-5 text-indigo-600" />
+                            <IconCalendar className="w-5 h-5 text-red-600" />
                             Detalhes do Treino
                          </h3>
                          <p className="text-slate-500 text-sm mt-1">{new Date(training.date).toLocaleDateString('pt-PT')} • {training.focus}</p>
@@ -467,13 +467,13 @@ const TrainingDetailsModal = ({
                  <div className="flex border-b border-slate-200 shrink-0 bg-slate-50/50">
                     <button 
                         onClick={() => setActiveTab('attendance')} 
-                        className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'attendance' ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                        className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'attendance' ? 'border-red-600 text-red-700 bg-red-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                     >
                         Presenças
                     </button>
                     <button 
                         onClick={() => setActiveTab('plan')} 
-                        className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'plan' ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                        className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'plan' ? 'border-red-600 text-red-700 bg-red-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                     >
                         Plano de Treino AI {training.aiPlan && <IconCheck className="w-3 h-3 inline ml-1 text-green-500"/>}
                     </button>
@@ -498,7 +498,7 @@ const TrainingDetailsModal = ({
                                              <select 
                                                 value={attendance[p.id] || AttendanceStatus.PRESENT} 
                                                 onChange={(e) => handleStatusChange(p.id, e.target.value as AttendanceStatus)}
-                                                className={`px-3 py-1.5 rounded-lg border text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-colors
+                                                className={`px-3 py-1.5 rounded-lg border text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer transition-colors
                                                     ${attendance[p.id] === AttendanceStatus.PRESENT ? 'bg-green-50 border-green-200 text-green-700' : ''}
                                                     ${attendance[p.id] === AttendanceStatus.ABSENT ? 'bg-slate-50 border-slate-200 text-slate-600' : ''}
                                                     ${attendance[p.id] === AttendanceStatus.INJURED ? 'bg-red-50 border-red-200 text-red-700' : ''}
@@ -518,7 +518,7 @@ const TrainingDetailsModal = ({
                      ) : (
                          <div className="p-8">
                              {training.aiPlan ? (
-                                <div className="prose prose-slate max-w-none prose-headings:text-indigo-800 prose-a:text-indigo-600">
+                                <div className="prose prose-slate max-w-none prose-headings:text-blue-900 prose-a:text-red-600">
                                     <ReactMarkdown>{training.aiPlan}</ReactMarkdown>
                                 </div>
                              ) : (
@@ -534,7 +534,7 @@ const TrainingDetailsModal = ({
                  
                  <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-xl">
                      <button onClick={onClose} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition-all">Cancelar</button>
-                     <button onClick={handleSave} className="px-5 py-2.5 bg-indigo-600 text-white font-medium hover:bg-indigo-700 rounded-lg shadow-sm transition-all flex items-center gap-2">
+                     <button onClick={handleSave} className="px-5 py-2.5 bg-red-600 text-white font-medium hover:bg-red-700 rounded-lg shadow-sm transition-all flex items-center gap-2">
                         <IconCheck className="w-4 h-4" />
                         Guardar Presenças
                      </button>
@@ -612,7 +612,7 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
-                <div className="bg-slate-900 p-6 flex justify-between items-center text-white shrink-0">
+                <div className="bg-blue-950 p-6 flex justify-between items-center text-white shrink-0">
                     <div>
                         <h2 className="text-xl font-bold flex items-center gap-2">
                             <IconTrophy className="w-5 h-5 text-yellow-500" />
@@ -629,9 +629,9 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
                 </div>
 
                 <div className="flex border-b border-slate-200 shrink-0 bg-slate-50">
-                    <button onClick={() => setActiveTab('selection')} className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'selection' ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Convocatória</button>
-                    <button onClick={() => setActiveTab('lineup')} className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'lineup' ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Alinhamento (XV)</button>
-                    <button onClick={() => setActiveTab('strategy')} className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'strategy' ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Estratégia AI</button>
+                    <button onClick={() => setActiveTab('selection')} className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'selection' ? 'border-red-600 text-red-700 bg-red-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Convocatória</button>
+                    <button onClick={() => setActiveTab('lineup')} className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'lineup' ? 'border-red-600 text-red-700 bg-red-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Alinhamento (XV)</button>
+                    <button onClick={() => setActiveTab('strategy')} className={`flex-1 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === 'strategy' ? 'border-red-600 text-red-700 bg-red-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Estratégia AI</button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
@@ -654,7 +654,7 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
                                                 <select 
                                                     value={localMatch.playerStatus?.[p.id] || MatchSelectionStatus.TECHNICAL}
                                                     onChange={(e) => handleSelectionChange(p.id, e.target.value as MatchSelectionStatus)}
-                                                    className={`px-3 py-1.5 rounded-md text-sm font-medium border focus:ring-2 focus:ring-indigo-500 outline-none
+                                                    className={`px-3 py-1.5 rounded-md text-sm font-medium border focus:ring-2 focus:ring-blue-500 outline-none
                                                         ${localMatch.playerStatus?.[p.id] === MatchSelectionStatus.SELECTED ? 'bg-green-50 border-green-200 text-green-700' : ''}
                                                         ${localMatch.playerStatus?.[p.id] === MatchSelectionStatus.INJURED ? 'bg-red-50 border-red-200 text-red-700' : ''}
                                                         ${localMatch.playerStatus?.[p.id] === MatchSelectionStatus.UNAVAILABLE ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-slate-200 text-slate-600'}
@@ -730,7 +730,7 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
                                     <button 
                                         onClick={handleGenerateStrategy}
                                         disabled={loadingStrategy}
-                                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                                        className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
                                     >
                                         {loadingStrategy ? <IconClock className="animate-spin w-5 h-5"/> : <IconBrain className="w-5 h-5"/>}
                                         {loadingStrategy ? 'A analisar...' : 'Gerar Estratégia de Jogo'}
@@ -739,10 +739,10 @@ const MatchDetailsModal = ({ match, players, onClose, onSave }: { match: Match, 
                             ) : (
                                 <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm prose prose-slate max-w-none overflow-y-auto">
                                     <div className="flex justify-between items-start mb-6 not-prose">
-                                        <h3 className="text-xl font-bold text-indigo-900 flex items-center gap-2">
+                                        <h3 className="text-xl font-bold text-blue-900 flex items-center gap-2">
                                             <IconBrain className="w-6 h-6"/> Plano de Jogo
                                         </h3>
-                                        <button onClick={handleGenerateStrategy} disabled={loadingStrategy} className="text-sm text-indigo-600 hover:underline">
+                                        <button onClick={handleGenerateStrategy} disabled={loadingStrategy} className="text-sm text-red-600 hover:underline">
                                             {loadingStrategy ? 'A regenerar...' : 'Regenerar'}
                                         </button>
                                     </div>
@@ -806,7 +806,7 @@ const DatabaseView = ({
                                 placeholder="AIzaSy..."
                             />
                         </div>
-                        <button onClick={saveConfig} className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 w-full font-medium transition-colors">
+                        <button onClick={saveConfig} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 w-full font-medium transition-colors">
                             Guardar e Conectar
                         </button>
                         <p className="text-xs text-slate-500 mt-2">Nota: Recarregue a página após alterar as chaves.</p>
@@ -863,7 +863,7 @@ const DashboardView = ({ players, trainings, matches }: { players: Player[], tra
 
     const statusData = [
       { name: 'Disponíveis', value: availablePlayers, color: '#22c55e' },
-      { name: 'Lesionados', value: injuredPlayers, color: '#ef4444' },
+      { name: 'Lesionados', value: injuredPlayers, color: '#dc2626' }, // Red-600
       { name: 'Outros', value: totalPlayers - availablePlayers - injuredPlayers, color: '#94a3b8' },
     ];
 
@@ -873,7 +873,7 @@ const DashboardView = ({ players, trainings, matches }: { players: Player[], tra
         
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="border-l-4 border-blue-500">
+          <Card className="border-l-4 border-blue-600">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-500 font-medium">Plantel Total</p>
@@ -895,7 +895,7 @@ const DashboardView = ({ players, trainings, matches }: { players: Player[], tra
               </div>
             </div>
           </Card>
-          <Card className="border-l-4 border-amber-500">
+          <Card className="border-l-4 border-red-500">
              <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-500 font-medium">Próximo Jogo</p>
@@ -904,7 +904,7 @@ const DashboardView = ({ players, trainings, matches }: { players: Player[], tra
                   {nextMatch ? new Date(nextMatch.date).toLocaleDateString('pt-PT') : '-'}
                 </p>
               </div>
-              <div className="bg-amber-100 p-3 rounded-full text-amber-600">
+              <div className="bg-red-100 p-3 rounded-full text-red-600">
                 <IconTrophy className="w-6 h-6" />
               </div>
             </div>
@@ -926,7 +926,7 @@ const DashboardView = ({ players, trainings, matches }: { players: Player[], tra
                         cursor={{fill: '#f1f5f9'}}
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     />
-                    <Bar dataKey="jogadores" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+                    <Bar dataKey="jogadores" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={40} />
                     </BarChart>
                 </ResponsiveContainer>
                 </div>
@@ -1180,7 +1180,7 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
             </button>
             <button 
                 onClick={() => setIsAdding(true)}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
             >
                 <IconUserPlus className="w-4 h-4" />
                 <span>Adicionar Jogador</span>
@@ -1225,7 +1225,7 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
               </div>
               <div className="flex gap-2">
                  <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-blue-600 hover:bg-blue-100 rounded-md">Cancelar</button>
-                 <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Guardar</button>
+                 <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Guardar</button>
               </div>
             </form>
           </Card>
@@ -1255,7 +1255,7 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                     <td className="px-6 py-4 text-right flex justify-end gap-2">
                         <button 
                         onClick={() => setEditingPlayer(player)}
-                        className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
                         title="Editar Ficha de Jogador"
                         >
                         <IconEdit className="w-4 h-4" />
@@ -1280,7 +1280,7 @@ const RosterView = ({ players, trainings, matches, addPlayer, removePlayer, upda
                 <p className="text-slate-500 mb-6">Adicione manualmente ou importe um CSV/Excel.</p>
                 <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-blue-600 font-medium hover:underline"
+                    className="text-red-600 font-medium hover:underline"
                 >
                     Importar do Excel (CSV)
                 </button>
@@ -1337,7 +1337,7 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">Treinos</h2>
-        <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+        <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
           <IconPlus className="w-4 h-4" /> Novo Treino
         </button>
       </div>
@@ -1353,7 +1353,7 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
                <label className="block text-sm font-medium text-blue-900 mb-1">Foco do Treino</label>
                <input type="text" value={newFocus} onChange={e => setNewFocus(e.target.value)} className="w-full px-3 py-2 rounded-md border border-blue-200" placeholder="Ex: Defesa em linha" required />
              </div>
-             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Guardar</button>
+             <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Guardar</button>
              <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-blue-600 hover:bg-blue-100 rounded-md">Cancelar</button>
            </form>
          </Card>
@@ -1376,7 +1376,7 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
           <Card key={t.id} className="hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group" onClick={() => setSelectedTraining(t)}>
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-lg text-slate-800 group-hover:text-blue-600 transition-colors">{new Date(t.date).toLocaleDateString('pt-PT')}</h3>
+                <h3 className="font-bold text-lg text-slate-800 group-hover:text-red-600 transition-colors">{new Date(t.date).toLocaleDateString('pt-PT')}</h3>
                 <p className="text-slate-600">{t.focus}</p>
               </div>
               <div className="flex items-center gap-4">
@@ -1385,7 +1385,7 @@ const TrainingView = ({ trainings, players, addTraining, updateTraining }: { tra
                   className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors z-10 flex items-center gap-2
                     ${t.aiPlan 
                         ? 'text-green-700 bg-green-50 hover:bg-green-100 border border-green-200' 
-                        : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+                        : 'text-red-600 bg-red-50 hover:bg-red-100'
                     }`}
                   disabled={loadingPlanId === t.id}
                 >
@@ -1447,7 +1447,7 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-slate-800">Gestão de Jogos</h2>
-                <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
                     <IconPlus className="w-4 h-4" /> Novo Jogo
                 </button>
             </div>
@@ -1487,7 +1487,7 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
                             <option value="Away">Fora</option>
                         </select>
                      </div>
-                     <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Guardar</button>
+                     <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Guardar</button>
                      <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-blue-600 hover:bg-blue-100 rounded-md">Cancelar</button>
                    </form>
                  </Card>
@@ -1507,11 +1507,11 @@ const MatchesView = ({ matches, players, addMatch, updateMatch }: { matches: Mat
                     <Card key={m.id} className="hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group" onClick={() => setSelectedMatch(m)}>
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-full ${m.location === 'Home' ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>
+                                <div className={`p-3 rounded-full ${m.location === 'Home' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
                                     <IconTrophy className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-lg text-slate-800 group-hover:text-blue-600 transition-colors">{m.opponent}</h3>
+                                    <h3 className="font-bold text-lg text-slate-800 group-hover:text-red-600 transition-colors">{m.opponent}</h3>
                                     <p className="text-slate-600 text-sm flex items-center gap-2">
                                         {new Date(m.date).toLocaleDateString('pt-PT')}
                                         <span className="w-1 h-1 rounded-full bg-slate-300"></span>
@@ -1621,12 +1621,12 @@ const AICoachView = ({ onOpenSettings }: { onOpenSettings: () => void }) => {
 
     return (
         <Card className="h-[calc(100vh-8rem)] flex flex-col p-0 overflow-hidden relative">
-            <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+            <div className="bg-blue-50 p-4 border-b border-slate-200 flex justify-between items-center">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                    <IconBrain className="w-5 h-5 text-indigo-600" />
+                    <IconBrain className="w-5 h-5 text-red-600" />
                     Assistente Técnico AI
                 </h3>
-                <button onClick={onOpenSettings} className="text-sm text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
+                <button onClick={onOpenSettings} className="text-sm text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
                     <IconSettings className="w-4 h-4"/> Configurar Chave
                 </button>
             </div>
@@ -1670,7 +1670,7 @@ const AICoachView = ({ onOpenSettings }: { onOpenSettings: () => void }) => {
                     placeholder="Escreve uma mensagem..."
                     disabled={apiKeyError}
                 />
-                <button onClick={send} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled={loading || apiKeyError}>
+                <button onClick={send} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50" disabled={loading || apiKeyError}>
                     Enviar
                 </button>
             </div>
@@ -1689,27 +1689,28 @@ const Sidebar = ({ view, setView, syncStatus, onOpenSettings }: { view: ViewStat
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col h-full shrink-0 transition-all hidden md:flex">
+    <aside className="w-64 bg-blue-950 text-slate-300 flex flex-col h-full shrink-0 transition-all hidden md:flex border-r border-blue-900">
       <div className="p-6">
-        <h1 className="text-xl font-bold text-white flex items-center gap-2">
-          <IconTrophy className="w-6 h-6 text-yellow-500" />
-          Rugby Manager
-        </h1>
+        {/* LOGO RECREATION */}
+        <div className="flex flex-col select-none mb-2">
+            <h1 className="text-3xl font-black tracking-tighter text-white uppercase leading-none" style={{ fontFamily: 'Arial Black, sans-serif' }}>RUGBY</h1>
+            <div className="bg-red-600 text-white font-bold text-sm px-1 py-0.5 tracking-[0.2em] uppercase w-full text-center mt-1">Santarém</div>
+        </div>
       </div>
       <nav className="flex-1 px-3 space-y-1">
         {menuItems.map(item => (
           <button
             key={item.id}
             onClick={() => setView(item.id)}
-            className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${view === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 hover:text-white'}`}
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${view === item.id ? 'bg-red-600 text-white shadow-lg' : 'hover:bg-blue-900 hover:text-white'}`}
           >
             <item.icon className="w-5 h-5" />
             <span className="font-medium">{item.label}</span>
           </button>
         ))}
       </nav>
-      <div className="p-6 border-t border-slate-800 space-y-4">
-        <button onClick={onOpenSettings} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition-colors text-sm">
+      <div className="p-6 border-t border-blue-900 space-y-4">
+        <button onClick={onOpenSettings} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-900 hover:text-white transition-colors text-sm">
             <IconSettings className="w-5 h-5 text-slate-400" />
             <span>Definições Globais</span>
         </button>
@@ -1853,8 +1854,11 @@ const App = () => {
       <main className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto min-h-full">
             {/* Mobile Header */}
-            <div className="md:hidden mb-4 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-                 <h1 className="font-bold text-slate-800">Rugby Manager</h1>
+            <div className="md:hidden mb-4 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border-l-4 border-red-600">
+                 <div className="flex flex-col select-none">
+                    <h1 className="text-xl font-black tracking-tighter text-blue-950 uppercase leading-none" style={{ fontFamily: 'Arial Black, sans-serif' }}>RUGBY</h1>
+                    <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 tracking-[0.2em] uppercase w-full text-center mt-1">Santarém</div>
+                </div>
                  <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500"><IconSettings className="w-5 h-5"/></button>
             </div>
             
@@ -1863,7 +1867,7 @@ const App = () => {
                  <select 
                     value={view} 
                     onChange={(e) => setView(e.target.value as ViewState)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 font-medium"
                  >
                      <option value="DASHBOARD">Dashboard</option>
                      <option value="ROSTER">Plantel</option>

@@ -7,6 +7,26 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
+        // Global error handler para apanhar erros de módulos antes do React iniciar
+        window.addEventListener('error', function(e) {
+            const root = document.getElementById('root');
+            // Ignorar erros de ResizeObserver que são benignos mas comuns
+            if (e.message && e.message.includes('ResizeObserver')) return;
+            
+            if (root && (e.message || e.error)) {
+                console.error("Erro Global:", e);
+                root.innerHTML = `<div style="color: #ef4444; padding: 2rem; font-family: sans-serif; text-align: center; max-width: 600px; margin: 0 auto;">
+                    <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">Erro ao Iniciar Aplicação</h2>
+                    <div style="background: #fee2e2; padding: 1rem; border-radius: 0.5rem; text-align: left; overflow: auto; margin-bottom: 1rem; border: 1px solid #fca5a5;">
+                        <p style="font-family: monospace; font-size: 0.9rem; margin: 0;">${e.message || String(e.error)}</p>
+                    </div>
+                    <p style="color: #64748b; margin-bottom: 1rem;">Isto pode dever-se a um conflito de versões ou erro de rede.</p>
+                    <button onclick="window.location.reload()" style="background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.25rem; cursor: pointer; font-weight: 500;">Tentar Novamente</button>
+                </div>`;
+            }
+        });
+    </script>
+    <script>
       // --- CONFIGURAÇÃO DA GOOGLE GEMINI API ---
       
       // CHAVE: Atualizada pelo utilizador
@@ -64,8 +84,8 @@
     "lucide-react": "https://esm.sh/lucide-react@0.441.0?deps=react@18.3.1",
     "recharts": "https://esm.sh/recharts@2.12.7?deps=react@18.3.1,react-dom@18.3.1",
     "xlsx": "https://esm.sh/xlsx@0.18.5",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
   }
 }
 </script>

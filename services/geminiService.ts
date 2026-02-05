@@ -2,38 +2,10 @@ import { GoogleGenAI } from "@google/genai";
 import { Player, Position, Match, TrainingSession } from '../types';
 
 const MODEL_NAME = 'gemini-3-flash-preview';
-const BAD_KEY = 'AIzaSyBMBM1TYgs3YrFmffEExDZ2gB3JWK2H90o'; // Chave incorreta que pode ter ficado em cache
-const DEFAULT_KEY = "AIzaSyAePgf-58mq8VvqQVM9lNGXod12ZPKByjI";
 
-// Helper para obter a chave de forma segura e hierárquica
+// Helper para obter a chave de forma segura
 const getAIClient = () => {
-  let apiKey = '';
-
-  // 1. Prioridade Máxima: Chave definida manualmente pelo utilizador (guardada no browser)
-  if (typeof window !== 'undefined') {
-      const storedKey = localStorage.getItem('rugby_manager_api_key');
-      // Proteção: Se a chave guardada for a "má" (do firebase), ignoramos e forçamos o default
-      if (storedKey && storedKey !== BAD_KEY) {
-          apiKey = storedKey;
-      }
-  }
-
-  // 2. Prioridade Média: Variável de Ambiente (Node/Build)
-  if (!apiKey && process.env.API_KEY) {
-      apiKey = process.env.API_KEY;
-  }
-  
-  // 3. Prioridade Baixa: Variável Global Injetada (Browser)
-  if (!apiKey && typeof window !== 'undefined') {
-    apiKey = (window as any).GEMINI_API_KEY || (window as any).process?.env?.API_KEY;
-  }
-
-  // 4. Fallback de segurança (Chave Hardcoded)
-  if (!apiKey) {
-      apiKey = DEFAULT_KEY;
-  }
-
-  return new GoogleGenAI({ apiKey: apiKey });
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 export const generateTrainingPlan = async (
@@ -67,7 +39,7 @@ export const generateTrainingPlan = async (
     return response.text || "Não foi possível gerar o plano de treino.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico. Verifique se a chave de API está correta nas definições.";
+    return "Erro ao contactar o assistente técnico. Verifique se a chave de API está configurada corretamente no ambiente.";
   }
 };
 
@@ -108,6 +80,6 @@ export const generateMatchStrategy = async (
     return response.text || "Não foi possível gerar a estratégia.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    return "Erro ao contactar o assistente técnico. Verifique as definições da API Key.";
+    return "Erro ao contactar o assistente técnico. Verifique se a chave de API está configurada corretamente no ambiente.";
   }
 };

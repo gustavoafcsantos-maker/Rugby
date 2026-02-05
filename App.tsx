@@ -13,7 +13,7 @@ import { generateTrainingPlan, generateMatchStrategy } from './services/geminiSe
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
 import * as XLSX from 'xlsx';
 
 // --- Helper Components ---

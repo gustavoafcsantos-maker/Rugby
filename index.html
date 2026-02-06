@@ -23,16 +23,19 @@
         // Global error handler
         window.addEventListener('error', function(e) {
             const root = document.getElementById('root');
+            // Ignorar erros benignos
             if (e.message && e.message.includes('ResizeObserver')) return;
             
             if (root && (e.message || e.error)) {
                 console.error("Erro Global:", e);
-                // Só mostra erro se o React ainda não tiver montado (root vazio ou com spinner)
+                // Só mostra o erro se a app ainda estiver no ecrã de loading
                 if (root.innerHTML.includes('animate-spin')) {
-                    root.innerHTML = `<div style="color: #ef4444; padding: 2rem; font-family: sans-serif; text-align: center;">
-                        <h2>Erro ao Iniciar</h2>
-                        <p>${e.message || String(e.error)}</p>
-                        <button onclick="window.location.reload()" style="margin-top:10px; padding:5px 10px; cursor:pointer">Tentar Novamente</button>
+                    root.innerHTML = `<div style="color: #ef4444; padding: 2rem; font-family: sans-serif; text-align: center; max-width:600px; margin:0 auto;">
+                        <h2 style="font-size:1.5rem; font-weight:bold; margin-bottom:1rem;">Erro ao Iniciar</h2>
+                        <div style="background:#fee2e2; padding:1rem; border-radius:0.5rem; text-align:left; overflow:auto; font-family:monospace; margin-bottom:1rem;">
+                           ${e.message || String(e.error)}
+                        </div>
+                        <button onclick="window.location.reload()" style="background:#2563eb; color:white; border:none; padding:0.5rem 1rem; border-radius:0.25rem; cursor:pointer;">Tentar Novamente</button>
                     </div>`;
                 }
             }
@@ -59,6 +62,8 @@
     "lucide-react": "https://esm.sh/lucide-react@0.441.0?deps=react@18.3.1",
     "recharts": "https://esm.sh/recharts@2.12.7?deps=react@18.3.1,react-dom@18.3.1",
     "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
   }
 }
 </script>
